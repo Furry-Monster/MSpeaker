@@ -80,6 +80,13 @@ namespace MSpeaker.Runtime.Views
         public virtual void DisplayChoices(MspDialogueEngineBase engine, MspConversation conversation,
             List<MspConversation> parsedConversations)
         {
+            foreach (var choiceButton in _choiceButtonInstances)
+            {
+                if (choiceButton == null) continue;
+                choiceButton.OnChoiceClick.RemoveAllListeners();
+                Destroy(choiceButton.gameObject);
+            }
+
             _choiceButtonInstances.Clear();
 
             if (engine == null || conversation?.Choices == null || conversation.Choices.Count == 0)
@@ -92,7 +99,7 @@ namespace MSpeaker.Runtime.Views
                 return;
             }
 
-            foreach (var choice in conversation.Choices.Keys.ToList())
+            foreach (var choice in conversation.Choices.Keys.Where(ShouldDisplayChoice).ToList())
             {
                 var instance = Instantiate(choiceButtonPrefab, choiceButtonHolder);
                 var choiceButton = instance.GetComponent<MspChoiceButton>();
@@ -122,6 +129,22 @@ namespace MSpeaker.Runtime.Views
 
                 _choiceButtonInstances.Add(choiceButton);
             }
+        }
+
+        protected virtual bool ShouldDisplayChoice(MspChoice choice)
+        {
+            if (string.IsNullOrEmpty(choice?.ConditionExpression))
+                return true;
+
+            // 简单的变量存在性检查
+            var expression = choice.ConditionExpression.Trim();
+            if (expression.StartsWith("$"))
+            {
+                var varName = expression.TrimStart('$');
+                return MspDialogueGlobals.GlobalVariables.ContainsKey(varName);
+            }
+
+            return true;
         }
     }
 }

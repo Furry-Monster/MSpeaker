@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using MSpeaker.Runtime.Utils;
 
 namespace Samples
@@ -13,7 +14,7 @@ namespace Samples
         [MspDialogueFunction]
         public static string GetPlayerName()
         {
-            return MspDialogueGlobals.GlobalVariables["playerName"];
+            return MspDialogueGlobals.GlobalVariables.GetValueOrDefault("playerName", "Unknown");
         }
 
         [MspDialogueFunction]
@@ -37,7 +38,14 @@ namespace Samples
         [MspDialogueFunction]
         public static void AddScore(int points)
         {
-            MspDialogueGlobals.GlobalVariables["score"] += points;
+            var current =
+                int.TryParse(MspDialogueGlobals.GlobalVariables.GetValueOrDefault(
+                        "score", "0"),
+                    out var score)
+                    ? score
+                    : 0;
+            MspDialogueGlobals.GlobalVariables["score"] =
+                (current + points).ToString();
         }
 
         [MspDialogueFunction]

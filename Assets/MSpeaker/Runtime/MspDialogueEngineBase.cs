@@ -81,6 +81,8 @@ namespace MSpeaker.Runtime
 
         public void StopConversation()
         {
+            var hadActiveConversation = _currentConversation != null;
+
             if (_displayCoroutine != null)
             {
                 StopCoroutine(_displayCoroutine);
@@ -97,7 +99,12 @@ namespace MSpeaker.Runtime
             _loopCounters.Clear();
             ResetConditionalState();
 
-            OnConversationEnd.Invoke();
+            // 只有在确实有活动对话时才触发结束事件
+            if (hadActiveConversation)
+            {
+                OnConversationEnd.Invoke();
+            }
+
             OnConversationStart.RemoveAllListeners();
             OnConversationEnd.RemoveAllListeners();
         }
