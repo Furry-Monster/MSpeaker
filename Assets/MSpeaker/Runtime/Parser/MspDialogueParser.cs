@@ -182,8 +182,8 @@ namespace MSpeaker.Runtime.Parser
             var argLineMatch = ArgumentInvocationLineRegex.Match(rawLine);
             if (argLineMatch.Success)
             {
-                invocationName = argLineMatch.Groups["name"].Value?.Trim();
-                invocationArg = argLineMatch.Groups["arg"].Value?.Trim();
+                invocationName = argLineMatch.Groups["name"].Value.Trim();
+                invocationArg = argLineMatch.Groups["arg"].Value.Trim();
 
                 if (string.Equals(invocationName, "Image", StringComparison.OrdinalIgnoreCase))
                     return Token.ImageInvoke;
@@ -250,18 +250,27 @@ namespace MSpeaker.Runtime.Parser
             var invocations = new Dictionary<int, string>();
             if (string.IsNullOrEmpty(rawLine)) return invocations;
 
+            // 使用循环和起始位置来准确查找所有匹配项，避免重复模式导致的索引错误
+            var searchStartIndex = 0;
             foreach (Match match in FunctionRegex.Matches(rawLine))
             {
                 var full = match.Value;
-                var index = rawLine.IndexOf(full, StringComparison.Ordinal);
+                // 从上次搜索位置开始查找，确保找到正确的匹配位置
+                var index = rawLine.IndexOf(full, searchStartIndex, StringComparison.Ordinal);
 
-                var name = full;
-                if (name.Length >= 4)
-                    name = name.Substring(2, name.Length - 4).Trim();
+                // 如果找到了匹配，更新搜索起始位置以避免重复匹配
+                if (index >= 0)
+                {
+                    searchStartIndex = index + full.Length;
 
-                // 行级的 {{Image(...)}} / {{DialogueName(...)}} 在上面作为 Token 处理；
-                // 行内出现时，这里只做普通 invocation 记录（运行时不会自动解析参数）
-                invocations[index] = name;
+                    var name = full;
+                    if (name.Length >= 4)
+                        name = name.Substring(2, name.Length - 4).Trim();
+
+                    // 行级的 {{Image(...)}} / {{DialogueName(...)}} 在上面作为 Token 处理；
+                    // 行内出现时，这里只做普通 invocation 记录（运行时不会自动解析参数）
+                    invocations[index] = name;
+                }
             }
 
             return invocations;
@@ -332,7 +341,10 @@ namespace MSpeaker.Runtime.Parser
                 return;
 
             // 合并文本（保留换行）
-            currentLine.LineContent.Text = string.Join("\n", sentenceParts.Select(p => p.Text)).TrimEnd('\n');
+            if (sentenceParts.Count > 0)
+                currentLine.LineContent.Text = string.Join("\n", sentenceParts.Select(p => p.Text)).TrimEnd('\n');
+            else
+                currentLine.LineContent.Text = string.Empty;
 
             // 合并 invocation（按文本拼接长度计算偏移）
             var offset = 0;

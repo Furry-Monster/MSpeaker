@@ -64,6 +64,11 @@ namespace MSpeaker.Runtime
             StopConversation();
             _currentConversation = conversation;
 
+            // 先移除可能存在的监听器，避免重复添加
+            OnConversationStart.RemoveListener(PersistentOnConversationStart.Invoke);
+            OnConversationEnd.RemoveListener(PersistentOnConversationEnd.Invoke);
+
+            // 然后添加监听器
             OnConversationStart.AddListener(PersistentOnConversationStart.Invoke);
             OnConversationEnd.AddListener(PersistentOnConversationEnd.Invoke);
 
@@ -187,7 +192,9 @@ namespace MSpeaker.Runtime
 
                     object[] args;
                     var parameters = method.GetParameters();
-                    if (parameters.Length == 1 && parameters[0].ParameterType.IsInstanceOfType(this))
+                    if (parameters.Length == 1 &&
+                        (parameters[0].ParameterType.IsAssignableFrom(typeof(MspDialogueEngineBase)) ||
+                         parameters[0].ParameterType == typeof(MspDialogueEngineBase)))
                         args = new object[] { this };
                     else if (parameters.Length == 0)
                         args = null;

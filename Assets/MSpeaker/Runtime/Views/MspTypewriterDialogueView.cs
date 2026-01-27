@@ -67,8 +67,9 @@ namespace MSpeaker.Runtime.Views
 
             var t = 0f;
             var shown = 0;
+            var fullTextLength = _fullText?.Length ?? 0;
 
-            while (shown < (_fullText?.Length ?? 0))
+            while (shown < fullTextLength)
             {
                 if (_isPaused)
                 {
@@ -77,7 +78,7 @@ namespace MSpeaker.Runtime.Views
                 }
 
                 t += Time.unscaledDeltaTime * charactersPerSecond;
-                var nextShown = Mathf.Clamp(Mathf.FloorToInt(t), 0, _fullText.Length);
+                var nextShown = Mathf.Clamp(Mathf.FloorToInt(t), 0, fullTextLength);
                 if (nextShown != shown)
                 {
                     shown = nextShown;
