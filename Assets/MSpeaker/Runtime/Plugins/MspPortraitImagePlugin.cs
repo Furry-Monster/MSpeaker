@@ -1,8 +1,8 @@
-using MSpeaker.Dialogue.Parser;
+using MSpeaker.Runtime.Parser;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace MSpeaker.Dialogue.Plugins
+namespace MSpeaker.Runtime.Plugins
 {
     /// <summary>
     /// 读取解析出的 SpeakerImage 并显示到 UI Image 上。

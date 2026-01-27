@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace MSpeaker.Dialogue
+namespace MSpeaker.Runtime
 {
     /// <summary>
     /// 存储 .msp 文本内容的 ScriptableObject（由 Importer 自动生成）。

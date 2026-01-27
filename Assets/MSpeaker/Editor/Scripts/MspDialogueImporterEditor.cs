@@ -2,7 +2,7 @@ using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEngine;
 
-namespace MSpeaker.Editor.Dialogue
+namespace MSpeaker.Editor
 {
     [CustomEditor(typeof(MspDialogueImporter))]
     public sealed class MspDialogueImporterEditor : ScriptedImporterEditor

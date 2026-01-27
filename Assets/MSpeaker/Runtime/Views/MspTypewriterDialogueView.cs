@@ -1,9 +1,9 @@
 using System.Collections;
-using MSpeaker.Dialogue.Parser;
-using MSpeaker.Dialogue.Plugins;
+using MSpeaker.Runtime.Parser;
+using MSpeaker.Runtime.Plugins;
 using UnityEngine;
 
-namespace MSpeaker.Dialogue.Views
+namespace MSpeaker.Runtime.Views
 {
     /// <summary>
     /// 打字机效果的 View：逐字显示 sentenceText。

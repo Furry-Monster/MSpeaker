@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace MSpeaker.Dialogue.Parser
+namespace MSpeaker.Runtime.Parser
 {
     public sealed class MspConversation
     {

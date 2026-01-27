@@ -2,7 +2,7 @@ using System.IO;
 using UnityEditor;
 using UnityEngine;
 
-namespace MSpeaker.Editor.Dialogue
+namespace MSpeaker.Editor
 {
     public static class CreateMspDialogue
     {

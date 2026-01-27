@@ -1,4 +1,4 @@
-using MSpeaker.Dialogue;
+using MSpeaker.Runtime;
 using UnityEngine;
 
 public sealed class StartMspDialogueOnPlay : MonoBehaviour

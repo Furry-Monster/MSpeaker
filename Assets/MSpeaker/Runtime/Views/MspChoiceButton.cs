@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-namespace MSpeaker.Dialogue.Views
+namespace MSpeaker.Runtime.Views
 {
     [RequireComponent(typeof(Button))]
     public sealed class MspChoiceButton : MonoBehaviour

@@ -1,4 +1,4 @@
-namespace MSpeaker.Dialogue
+namespace MSpeaker.Runtime
 {
     /// <summary>
     /// 示例：用于演示 {{PlayerName}} 这类 invocation。

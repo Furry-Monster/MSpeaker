@@ -3,13 +3,13 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using MSpeaker.Dialogue.Parser;
-using MSpeaker.Dialogue.Plugins;
-using MSpeaker.Dialogue.Views;
+using MSpeaker.Runtime.Parser;
+using MSpeaker.Runtime.Plugins;
+using MSpeaker.Runtime.Views;
 using UnityEngine;
 using UnityEngine.Events;
 
-namespace MSpeaker.Dialogue
+namespace MSpeaker.Runtime
 {
     public abstract class MspDialogueEngineBase : MonoBehaviour
     {

@@ -1,7 +1,7 @@
-using MSpeaker.Dialogue.Parser;
+using MSpeaker.Runtime.Parser;
 using UnityEngine;
 
-namespace MSpeaker.Dialogue.Plugins
+namespace MSpeaker.Runtime.Plugins
 {
     /// <summary>
     /// Engine 插件：用于在显示每一行时同步更新额外 UI（例如头像、音效等）。

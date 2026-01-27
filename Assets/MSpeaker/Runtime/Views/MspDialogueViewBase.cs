@@ -1,12 +1,12 @@
 using System.Collections.Generic;
 using System.Linq;
-using MSpeaker.Dialogue.Parser;
-using MSpeaker.Dialogue.Plugins;
+using MSpeaker.Runtime.Parser;
+using MSpeaker.Runtime.Plugins;
 using TMPro;
 using UnityEngine;
 using UnityEngine.Events;
 
-namespace MSpeaker.Dialogue.Views
+namespace MSpeaker.Runtime.Views
 {
     public class MspDialogueViewBase : MonoBehaviour
     {

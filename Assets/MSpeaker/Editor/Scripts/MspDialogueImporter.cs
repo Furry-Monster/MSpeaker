@@ -1,10 +1,10 @@
 using System.IO;
 using System.Text;
-using MSpeaker.Dialogue;
+using MSpeaker.Runtime;
 using UnityEditor.AssetImporters;
 using UnityEngine;
 
-namespace MSpeaker.Editor.Dialogue
+namespace MSpeaker.Editor
 {
     [ScriptedImporter(1, "msp")]
     public sealed class MspDialogueImporter : ScriptedImporter

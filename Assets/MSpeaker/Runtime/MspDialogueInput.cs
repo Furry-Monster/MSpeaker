@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 #endif
 
-namespace MSpeaker.Dialogue
+namespace MSpeaker.Runtime
 {
     /// <summary>
     /// 一个很轻量的输入脚本：点击/空格推进对话；若当前 View 在播放效果则先跳过效果。

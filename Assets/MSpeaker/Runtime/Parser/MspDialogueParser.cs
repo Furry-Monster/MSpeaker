@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using UnityEngine;
 
-namespace MSpeaker.Dialogue.Parser
+namespace MSpeaker.Runtime.Parser
 {
     /// <summary>
     /// 解析 .msp 文本为对话结构。语法参考 Ibralogue：

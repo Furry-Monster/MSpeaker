@@ -1,4 +1,4 @@
-namespace MSpeaker.Dialogue
+namespace MSpeaker.Runtime
 {
     /// <summary>
     /// 最简单的 Engine：直接继承基类即可使用。
