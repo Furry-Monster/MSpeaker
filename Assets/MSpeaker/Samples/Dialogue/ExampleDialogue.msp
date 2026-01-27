@@ -1,0 +1,16 @@
+# ExampleDialogue.msp
+# Sample dialogue file. Imported as MspDialogueAsset.
+
+{{DialogueName(Init)}}
+[NPC]
+Welcome to the MSpeaker dialogue plugin!
+You can inline-insert {{PlayerName}} in a sentence. ## tag:intro
+
+- Continue -> Next
+
+{{DialogueName(Next)}}
+[NPC]
+If you place portraits under a Resources folder, you can switch portrait like this:
+{{Image(avatar)}}
+Alright, end of sample.
+

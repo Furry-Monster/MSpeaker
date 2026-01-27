@@ -1,0 +1,19 @@
+# MSpeaker Dialogue (.msp)
+# Syntax:
+# - Speaker: [Name]
+# - Conversation: {{DialogueName(Name)}} (also supports {{ConversationName(Name)}})
+# - Choice: - Text -> ConversationName
+# - Image: {{Image(Path/Under/Resources)}}
+# - Function: {{Foo}}
+# - Metadata: ## key:value flag
+
+{{DialogueName(Init)}}
+[NPC]
+Hello, world!
+
+- Continue -> Next
+
+{{DialogueName(Next)}}
+[Player]
+This is the second conversation.
+

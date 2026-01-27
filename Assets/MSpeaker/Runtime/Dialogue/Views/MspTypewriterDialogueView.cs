@@ -1,0 +1,106 @@
+using System.Collections;
+using MSpeaker.Dialogue.Parser;
+using MSpeaker.Dialogue.Plugins;
+using UnityEngine;
+
+namespace MSpeaker.Dialogue.Views
+{
+    /// <summary>
+    /// 打字机效果的 View：逐字显示 sentenceText。
+    /// </summary>
+    public sealed class MspTypewriterDialogueView : MspDialogueViewBase
+    {
+        [SerializeField, Min(1f)] private float charactersPerSecond = 40f;
+
+        private Coroutine _typeCoroutine;
+        private string _fullText;
+
+        public override void SetView(MspConversation conversation, int lineIndex)
+        {
+            if (conversation == null || conversation.Lines == null) return;
+            if (lineIndex < 0 || lineIndex >= conversation.Lines.Count) return;
+
+            if (nameText != null) nameText.text = conversation.Lines[lineIndex].Speaker ?? string.Empty;
+
+            _fullText = conversation.Lines[lineIndex].LineContent?.Text ?? string.Empty;
+            if (sentenceText != null) sentenceText.text = string.Empty;
+
+            if (_typeCoroutine != null)
+            {
+                StopCoroutine(_typeCoroutine);
+                _typeCoroutine = null;
+            }
+
+            _isStillDisplaying = true;
+            _typeCoroutine = StartCoroutine(TypeRoutine());
+
+            OnSetView.Invoke();
+        }
+
+        public override void ClearView(MspEnginePlugin[] enginePlugins)
+        {
+            if (_typeCoroutine != null)
+            {
+                StopCoroutine(_typeCoroutine);
+                _typeCoroutine = null;
+            }
+            _isStillDisplaying = false;
+            _fullText = string.Empty;
+            base.ClearView(enginePlugins);
+        }
+
+        public override void SkipViewEffect()
+        {
+            if (!_isStillDisplaying) return;
+            if (sentenceText != null) sentenceText.text = _fullText ?? string.Empty;
+            FinishTypewriter();
+        }
+
+        private IEnumerator TypeRoutine()
+        {
+            if (sentenceText == null)
+            {
+                FinishTypewriter();
+                yield break;
+            }
+
+            float t = 0f;
+            int shown = 0;
+
+            while (shown < (_fullText?.Length ?? 0))
+            {
+                if (_isPaused)
+                {
+                    yield return null;
+                    continue;
+                }
+
+                t += Time.unscaledDeltaTime * charactersPerSecond;
+                int nextShown = Mathf.Clamp(Mathf.FloorToInt(t), 0, _fullText.Length);
+                if (nextShown != shown)
+                {
+                    shown = nextShown;
+                    sentenceText.text = _fullText.Substring(0, shown);
+                }
+
+                yield return null;
+            }
+
+            sentenceText.text = _fullText ?? string.Empty;
+            FinishTypewriter();
+        }
+
+        private void FinishTypewriter()
+        {
+            if (_typeCoroutine != null)
+            {
+                StopCoroutine(_typeCoroutine);
+                _typeCoroutine = null;
+            }
+
+            _isStillDisplaying = false;
+            OnLineComplete.Invoke();
+        }
+    }
+}
+
