@@ -1,13 +1,9 @@
 using System.Collections;
 using MSpeaker.Runtime.Parser;
-using MSpeaker.Runtime.Plugins;
 using UnityEngine;
 
 namespace MSpeaker.Runtime.Views
 {
-    /// <summary>
-    /// 打字机效果的 View：逐字显示 sentenceText。
-    /// </summary>
     public sealed class MspTypewriterDialogueView : MspDialogueViewBase
     {
         [SerializeField, Min(1f)] private float charactersPerSecond = 40f;
@@ -20,7 +16,8 @@ namespace MSpeaker.Runtime.Views
             if (conversation?.Lines == null) return;
             if (lineIndex < 0 || lineIndex >= conversation.Lines.Count) return;
 
-            if (nameText != null) nameText.text = conversation.Lines[lineIndex].Speaker ?? string.Empty;
+            if (nameText != null)
+                nameText.text = conversation.Lines[lineIndex].Speaker ?? string.Empty;
 
             _fullText = conversation.Lines[lineIndex].LineContent?.Text ?? string.Empty;
             if (sentenceText != null) sentenceText.text = string.Empty;
@@ -37,7 +34,7 @@ namespace MSpeaker.Runtime.Views
             OnSetView.Invoke();
         }
 
-        public override void ClearView(MspEnginePlugin[] enginePlugins)
+        public override void ClearView()
         {
             if (_typeCoroutine != null)
             {
@@ -47,7 +44,7 @@ namespace MSpeaker.Runtime.Views
 
             _isStillDisplaying = false;
             _fullText = string.Empty;
-            base.ClearView(enginePlugins);
+            base.ClearView();
         }
 
         public override void SkipViewEffect()

@@ -1,35 +1,50 @@
-using MSpeaker.Runtime.Parser;
+using System.Collections.Generic;
+using MSpeaker.Runtime.Interfaces;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace MSpeaker.Runtime.Plugins
 {
-    /// <summary>
-    /// 读取解析出的 SpeakerImage 并显示到 UI Image 上。
-    /// 配合 .msp 中的 {{Image(path)}} 使用（path 为 Resources 相对路径）。
-    /// </summary>
     public sealed class MspPortraitImagePlugin : MspEnginePlugin
     {
         [SerializeField] private Image portraitImage;
         [SerializeField] private bool hideWhenNull = true;
 
-        public override void Display(MspConversation conversation, int lineIndex)
-        {
-            if (portraitImage == null || conversation?.Lines == null) return;
-            if (lineIndex < 0 || lineIndex >= conversation.Lines.Count) return;
+        private readonly Dictionary<string, Sprite> _spriteCache = new();
 
-            var sprite = conversation.Lines[lineIndex].SpeakerImage;
+        public override MspPluginResult OnLineDisplay(IMspPluginContext context)
+        {
+            if (portraitImage == null || context.CurrentLine == null)
+                return MspPluginResult.Continue;
+
+            var path = context.CurrentLine.SpeakerImagePath;
+            var sprite = LoadSprite(path);
             portraitImage.sprite = sprite;
 
             if (hideWhenNull)
                 portraitImage.gameObject.SetActive(sprite != null);
+
+            return MspPluginResult.Continue;
         }
 
-        public override void Clear()
+        public override void OnClear()
         {
             if (portraitImage == null) return;
             portraitImage.sprite = null;
-            if (hideWhenNull) portraitImage.gameObject.SetActive(false);
+            if (hideWhenNull)
+                portraitImage.gameObject.SetActive(false);
+        }
+
+        private Sprite LoadSprite(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            if (_spriteCache.TryGetValue(path, out var cached))
+                return cached;
+
+            var sprite = Resources.Load<Sprite>(path);
+            _spriteCache[path] = sprite;
+            return sprite;
         }
     }
 }

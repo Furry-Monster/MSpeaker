@@ -3,9 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
-using MSpeaker.Runtime.Parser;
 
-namespace MSpeaker.Runtime.Utils
+namespace MSpeaker.Runtime.Parser
 {
     /// <summary>
     /// 函数参数解析和类型转换工具
@@ -218,17 +217,5 @@ namespace MSpeaker.Runtime.Utils
         {
             return IntegerRegex.IsMatch(value) || FloatRegex.IsMatch(value);
         }
-    }
-
-    /// <summary>
-    /// 条件信息
-    /// </summary>
-    public sealed class MspConditionInfo
-    {
-        public bool IsValid;
-        public string LeftOperand;
-        public string Operator;
-        public string RightOperand;
-        public bool IsVariableComparison;
     }
 }

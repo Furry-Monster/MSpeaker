@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace MSpeaker.Runtime.Parser
 {
@@ -7,42 +6,18 @@ namespace MSpeaker.Runtime.Parser
     {
         public string Name;
         public List<MspLine> Lines;
-
-        /// <summary>
-        /// Choice -> lineIndex。到达指定 lineIndex 时显示该 Choice。
-        /// </summary>
         public Dictionary<MspChoice, int> Choices;
-
-        /// <summary>
-        /// 标签 -> lineIndex。用于 Goto 跳转。
-        /// </summary>
         public Dictionary<string, int> Labels;
-
-        /// <summary>
-        /// 条件分支信息。lineIndex -> 条件分支数据。
-        /// </summary>
         public Dictionary<int, MspConditionalBlock> ConditionalBlocks;
     }
 
     public sealed class MspLine
     {
         public string Speaker;
-        public Sprite SpeakerImage;
+        public string SpeakerImagePath;
         public MspLineContent LineContent;
-
-        /// <summary>
-        /// 行类型：普通行、标签、条件开始、条件结束等
-        /// </summary>
         public MspLineType LineType;
-
-        /// <summary>
-        /// 标签名称（当 LineType 为 Label 时）
-        /// </summary>
         public string LabelName;
-
-        /// <summary>
-        /// 循环信息（当 LineType 为 LoopStart 时）
-        /// </summary>
         public MspLoopInfo LoopInfo;
     }
 
@@ -127,10 +102,15 @@ namespace MSpeaker.Runtime.Parser
         public string ChoiceName;
         public string LeadingConversationName;
         public Dictionary<string, string> Metadata;
-
-        /// <summary>
-        /// 条件表达式，如果设置则只有满足条件时才显示此选项
-        /// </summary>
         public string ConditionExpression;
+    }
+
+    public sealed class MspConditionInfo
+    {
+        public bool IsValid;
+        public string LeftOperand;
+        public string Operator;
+        public string RightOperand;
+        public bool IsVariableComparison;
     }
 }

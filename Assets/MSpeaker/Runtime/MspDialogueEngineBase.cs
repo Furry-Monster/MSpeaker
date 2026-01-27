@@ -2,9 +2,10 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using MSpeaker.Runtime.Interfaces;
 using MSpeaker.Runtime.Parser;
 using MSpeaker.Runtime.Plugins;
+using MSpeaker.Runtime.Services;
 using MSpeaker.Runtime.Utils;
 using MSpeaker.Runtime.Views;
 using UnityEngine;
@@ -12,19 +13,32 @@ using UnityEngine.Events;
 
 namespace MSpeaker.Runtime
 {
-    public abstract class MspDialogueEngineBase : MonoBehaviour
+    public abstract class MspDialogueEngineBase : MonoBehaviour, IMspDialogueEngine
     {
-        protected MspEnginePlugin[] enginePlugins;
+        [Header("Dialogue Views")]
+        [SerializeField] protected MspDialogueViewBase dialogueView;
+
+        [Header("Function Invocations")]
+        [SerializeField] private bool searchAllAssemblies;
+        [SerializeField] private List<string> includedAssemblies = new();
 
         public UnityEvent PersistentOnConversationStart = new();
         public UnityEvent PersistentOnConversationEnd = new();
 
         [HideInInspector] public UnityEvent OnConversationStart = new();
         [HideInInspector] public UnityEvent OnConversationEnd = new();
+        public UnityEvent OnConversationPaused = new();
+        public UnityEvent OnConversationResumed = new();
+
+        UnityEvent IMspDialogueEngine.OnConversationStart => OnConversationStart;
+        UnityEvent IMspDialogueEngine.OnConversationEnd => OnConversationEnd;
+        UnityEvent IMspDialogueEngine.OnConversationPaused => OnConversationPaused;
+        UnityEvent IMspDialogueEngine.OnConversationResumed => OnConversationResumed;
 
         public List<MspConversation> ParsedConversations { get; protected set; }
-        protected MspConversation _currentConversation;
+        public IMspDialogueView View => dialogueView;
 
+        protected MspConversation _currentConversation;
         protected int _lineIndex;
         protected bool _linePlaying;
         protected bool _isPaused;
@@ -34,18 +48,30 @@ namespace MSpeaker.Runtime
         private bool _skippingConditionalBlock;
         private int _conditionalBlockEndIndex = -1;
 
-        public UnityEvent OnConversationPaused = new();
-        public UnityEvent OnConversationResumed = new();
+        // Services
+        protected IMspVariableService _variableService;
+        protected IMspConditionEvaluator _conditionEvaluator;
+        protected IMspFunctionInvoker _functionInvoker;
 
-        [Header("Dialogue Views")] [SerializeField]
-        protected MspDialogueViewBase dialogueView;
+        // Plugins
+        protected MspEnginePlugin[] _plugins;
+        protected readonly MspPluginContext _pluginContext = new();
 
-        public MspDialogueViewBase View => dialogueView;
+        protected virtual void Awake()
+        {
+            InitializeServices();
+        }
 
-        [Header("Function Invocations")] [SerializeField]
-        private bool searchAllAssemblies;
+        protected virtual void InitializeServices()
+        {
+            _variableService = new MspVariableService();
+            _conditionEvaluator = new MspConditionEvaluator(_variableService);
+            _functionInvoker = new MspFunctionInvoker(_variableService, searchAllAssemblies, includedAssemblies);
 
-        [SerializeField] private List<string> includedAssemblies = new();
+            // 同步静态全局变量到服务
+            foreach (var kv in MspDialogueGlobals.GlobalVariables)
+                _variableService.SetValue(kv.Key, kv.Value);
+        }
 
         public void StartConversation(MspDialogueAsset dialogueAsset, int startIndex = 0)
         {
@@ -54,11 +80,17 @@ namespace MSpeaker.Runtime
             ParsedConversations = MspDialogueParser.Parse(dialogueAsset);
 
             if (startIndex < 0 || startIndex >= ParsedConversations.Count)
-                throw new ArgumentOutOfRangeException(nameof(startIndex),
-                    "Expected value is between 0 and conversations count (inclusive)");
+                throw new ArgumentOutOfRangeException(nameof(startIndex));
 
-            enginePlugins = GetComponents<MspEnginePlugin>();
+            _plugins = GetComponents<MspEnginePlugin>();
+            SortPlugins();
             SwitchConversation(ParsedConversations[startIndex]);
+        }
+
+        private void SortPlugins()
+        {
+            if (_plugins == null || _plugins.Length <= 1) return;
+            Array.Sort(_plugins, (a, b) => a.Priority.CompareTo(b.Priority));
         }
 
         public void SwitchConversation(MspConversation conversation)
@@ -75,6 +107,9 @@ namespace MSpeaker.Runtime
             OnConversationStart.AddListener(PersistentOnConversationStart.Invoke);
             OnConversationEnd.AddListener(PersistentOnConversationEnd.Invoke);
 
+            UpdatePluginContext();
+            NotifyPlugins(p => p.OnConversationStart(_pluginContext));
+
             OnConversationStart.Invoke();
             _displayCoroutine = StartCoroutine(DisplayDialogue());
         }
@@ -90,7 +125,9 @@ namespace MSpeaker.Runtime
             }
 
             if (dialogueView != null)
-                dialogueView.ClearView(enginePlugins);
+                dialogueView.ClearView();
+
+            NotifyPlugins(p => p.OnClear());
 
             _linePlaying = false;
             _lineIndex = 0;
@@ -99,9 +136,10 @@ namespace MSpeaker.Runtime
             _loopCounters.Clear();
             ResetConditionalState();
 
-            // 只有在确实有活动对话时才触发结束事件
             if (hadActiveConversation)
             {
+                UpdatePluginContext();
+                NotifyPlugins(p => p.OnConversationEnd(_pluginContext));
                 OnConversationEnd.Invoke();
             }
 
@@ -114,6 +152,9 @@ namespace MSpeaker.Runtime
             if (_currentConversation == null || _isPaused) return;
             _isPaused = true;
             if (dialogueView != null) dialogueView.Pause();
+
+            UpdatePluginContext();
+            NotifyPlugins(p => p.OnPause(_pluginContext));
             OnConversationPaused.Invoke();
         }
 
@@ -122,10 +163,243 @@ namespace MSpeaker.Runtime
             if (_currentConversation == null || !_isPaused) return;
             _isPaused = false;
             if (dialogueView != null) dialogueView.Resume();
+
+            UpdatePluginContext();
+            NotifyPlugins(p => p.OnResume(_pluginContext));
             OnConversationResumed.Invoke();
         }
 
         public bool IsConversationPaused() => _isPaused;
+
+        public void JumpTo(string conversationName)
+        {
+            if (ParsedConversations == null || ParsedConversations.Count == 0)
+                throw new InvalidOperationException("No conversation active.");
+
+            var conversation = ParsedConversations.Find(c => c.Name == conversationName);
+            if (conversation == null)
+                throw new ArgumentException($"Conversation \"{conversationName}\" not found.", nameof(conversationName));
+
+            SwitchConversation(conversation);
+        }
+
+        public void TryDisplayNextLine()
+        {
+            if (_linePlaying || _currentConversation == null || dialogueView == null)
+                return;
+
+            if (HasChoicesAtLine(_lineIndex) || HasChoicesAtNextEndIf())
+                return;
+
+            dialogueView.ClearView();
+            NotifyPlugins(p => p.OnClear());
+
+            if (_lineIndex < _currentConversation.Lines.Count - 1)
+            {
+                _lineIndex++;
+                StartCoroutine(DisplayDialogue());
+            }
+            else
+            {
+                StopConversation();
+            }
+        }
+
+        protected virtual IEnumerator DisplayDialogue()
+        {
+            if (dialogueView == null || !ValidateLineIndex())
+            {
+                _linePlaying = false;
+                yield break;
+            }
+
+            _linePlaying = true;
+            var currentLine = _currentConversation.Lines[_lineIndex];
+
+            // 处理控制流行
+            var controlResult = HandleControlFlowLine(currentLine);
+            if (controlResult.HasValue)
+            {
+                if (controlResult.Value >= 0)
+                    yield return StartCoroutine(JumpToLineAndContinue(controlResult.Value));
+                else
+                    yield return StartCoroutine(ContinueToNextLine());
+                yield break;
+            }
+
+            // 处理条件跳过
+            if (_skippingConditionalBlock && _conditionalBlockEndIndex >= 0 && _lineIndex < _conditionalBlockEndIndex)
+            {
+                yield return StartCoroutine(ContinueToNextLine());
+                yield break;
+            }
+
+            // 显示对话
+            UpdatePluginContext();
+            NotifyPlugins(p => p.OnBeforeLineDisplay(_pluginContext, currentLine));
+
+            TryDisplayChoices();
+            dialogueView.SetView(_currentConversation, _lineIndex);
+
+            // 插件显示并等待
+            yield return StartCoroutine(NotifyPluginsLineDisplay());
+
+            _functionInvoker.Invoke(currentLine.LineContent?.Invocations, currentLine.LineContent, this);
+            if (currentLine.LineContent?.Invocations?.Count > 0)
+                dialogueView.SetView(_currentConversation, _lineIndex);
+
+            yield return new WaitUntil(() => !dialogueView.IsStillDisplaying() || _isPaused);
+            if (_isPaused) yield return new WaitUntil(() => !_isPaused);
+
+            NotifyPlugins(p => p.OnLineComplete(_pluginContext));
+            _linePlaying = false;
+        }
+
+        private bool ValidateLineIndex()
+        {
+            if (_currentConversation?.Lines == null || _lineIndex < 0 || _lineIndex >= _currentConversation.Lines.Count)
+            {
+                MspDialogueLogger.LogError(-1, $"Invalid line index: {_lineIndex}", this);
+                return false;
+            }
+            return true;
+        }
+
+        // 返回跳转目标行号，-1表示继续下一行，null表示不是控制流行
+        private int? HandleControlFlowLine(MspLine line)
+        {
+            switch (line.LineType)
+            {
+                case MspLineType.Label:
+                    return -1;
+
+                case MspLineType.Goto:
+                    if (_currentConversation.Labels?.TryGetValue(line.LabelName, out var targetIndex) == true)
+                        return targetIndex;
+                    MspDialogueLogger.LogError(-1, $"Label not found: {line.LabelName}", this);
+                    _linePlaying = false;
+                    return null;
+
+                case MspLineType.LoopStart:
+                    return HandleLoopStart(line);
+
+                case MspLineType.LoopEnd:
+                    return HandleLoopEnd();
+
+                case MspLineType.IfStart:
+                    return HandleIfStart(line);
+
+                case MspLineType.Else:
+                    return HandleElse();
+
+                case MspLineType.EndIf:
+                    return HandleEndIf();
+
+                default:
+                    return null;
+            }
+        }
+
+        private int? HandleLoopStart(MspLine line)
+        {
+            if (!_loopCounters.ContainsKey(_lineIndex))
+            {
+                var loopCount = EvaluateLoopCount(line.LoopInfo);
+                _loopCounters[_lineIndex] = loopCount;
+            }
+
+            if (_loopCounters[_lineIndex] > 0)
+            {
+                _loopCounters[_lineIndex]--;
+                return _lineIndex + 1;
+            }
+
+            return line.LoopInfo?.LoopEndLineIndex >= 0 ? line.LoopInfo.LoopEndLineIndex : -1;
+        }
+
+        private int? HandleLoopEnd()
+        {
+            var loopStart = _currentConversation.Lines
+                .Select((l, idx) => new { l, idx })
+                .FirstOrDefault(x => x.l.LineType == MspLineType.LoopStart &&
+                                     x.l.LoopInfo?.LoopEndLineIndex == _lineIndex);
+
+            if (loopStart != null && _loopCounters.TryGetValue(loopStart.idx, out var count) && count > 0)
+                return loopStart.idx;
+
+            return -1;
+        }
+
+        private int? HandleIfStart(MspLine line)
+        {
+            var block = _currentConversation.ConditionalBlocks?.GetValueOrDefault(_lineIndex);
+            if (block == null) return null;
+
+            var conditionMet = _conditionEvaluator.Evaluate(block.ConditionExpression);
+
+            if (conditionMet)
+            {
+                _skippingConditionalBlock = false;
+                _conditionalBlockEndIndex = block.EndIfLineIndex;
+                return null;
+            }
+
+            _skippingConditionalBlock = true;
+            if (block.ElseLineIndex >= 0)
+            {
+                _skippingConditionalBlock = false;
+                _conditionalBlockEndIndex = block.EndIfLineIndex;
+                return block.ElseLineIndex + 1;
+            }
+
+            ResetConditionalState();
+            return block.EndIfLineIndex;
+        }
+
+        private int? HandleElse()
+        {
+            var block = _currentConversation.ConditionalBlocks?.Values
+                .FirstOrDefault(b => b.ElseLineIndex == _lineIndex);
+            if (block != null)
+            {
+                ResetConditionalState();
+                return block.EndIfLineIndex;
+            }
+            return null;
+        }
+
+        private int? HandleEndIf()
+        {
+            ResetConditionalState();
+
+            if (HasChoicesAtLine(_lineIndex))
+            {
+                var previousLineIndex = FindPreviousNormalLine(_lineIndex - 1);
+                if (previousLineIndex >= 0)
+                    return previousLineIndex;
+            }
+
+            return -1;
+        }
+
+        protected virtual int EvaluateLoopCount(MspLoopInfo loopInfo)
+        {
+            if (loopInfo == null) return 1;
+
+            var expression = loopInfo.LoopCountExpression;
+            if (string.IsNullOrEmpty(expression))
+                return loopInfo.LoopCount;
+
+            if (expression.StartsWith("$"))
+            {
+                var varValue = _variableService.GetValue(expression);
+                if (varValue is int intVal) return intVal;
+                if (int.TryParse(varValue?.ToString(), out var parsed)) return parsed;
+                return 1;
+            }
+
+            return int.TryParse(expression, out var count) ? count : loopInfo.LoopCount;
+        }
 
         private void ResetConditionalState()
         {
@@ -135,8 +409,15 @@ namespace MSpeaker.Runtime
 
         private bool HasChoicesAtLine(int lineIndex)
         {
-            return _currentConversation?.Choices != null &&
-                   _currentConversation.Choices.Any(x => x.Value == lineIndex);
+            return _currentConversation?.Choices?.Any(x => x.Value == lineIndex) == true;
+        }
+
+        private bool HasChoicesAtNextEndIf()
+        {
+            var nextLineIndex = _lineIndex + 1;
+            if (nextLineIndex >= _currentConversation.Lines.Count) return false;
+            var nextLine = _currentConversation.Lines[nextLineIndex];
+            return nextLine.LineType == MspLineType.EndIf && HasChoicesAtLine(nextLineIndex);
         }
 
         private int FindPreviousNormalLine(int startIndex)
@@ -144,13 +425,9 @@ namespace MSpeaker.Runtime
             for (var i = startIndex; i >= 0; i--)
             {
                 var line = _currentConversation.Lines[i];
-                if (line.LineType == MspLineType.Normal &&
-                    !string.IsNullOrWhiteSpace(line.LineContent?.Text))
-                {
+                if (line.LineType == MspLineType.Normal && !string.IsNullOrWhiteSpace(line.LineContent?.Text))
                     return i;
-                }
             }
-
             return -1;
         }
 
@@ -159,38 +436,30 @@ namespace MSpeaker.Runtime
             if (_currentConversation?.Choices is not { Count: > 0 }) return;
 
             var foundChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == _lineIndex);
-            if (foundChoice.Key != null && _lineIndex == foundChoice.Value)
+            if (foundChoice.Key != null)
             {
-                if (ShouldDisplayChoice(foundChoice.Key))
-                {
-                    dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
-                }
-
+                DisplayChoicesIfConditionMet(foundChoice.Key);
                 return;
             }
 
             var nextLineIndex = _lineIndex + 1;
-            if (nextLineIndex < _currentConversation.Lines.Count)
+            if (nextLineIndex < _currentConversation.Lines.Count &&
+                _currentConversation.Lines[nextLineIndex].LineType == MspLineType.EndIf)
             {
-                var nextLine = _currentConversation.Lines[nextLineIndex];
-                if (nextLine.LineType == MspLineType.EndIf)
-                {
-                    var endifChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == nextLineIndex);
-                    if (endifChoice.Key != null && nextLineIndex == endifChoice.Value)
-                    {
-                        if (ShouldDisplayChoice(endifChoice.Key))
-                        {
-                            dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
-                        }
-                    }
-                }
+                var endifChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == nextLineIndex);
+                if (endifChoice.Key != null)
+                    DisplayChoicesIfConditionMet(endifChoice.Key);
             }
         }
 
-        private bool ShouldDisplayChoice(MspChoice choice)
+        private void DisplayChoicesIfConditionMet(MspChoice choice)
         {
-            return string.IsNullOrEmpty(choice.ConditionExpression) ||
-                   EvaluateConditionExpression(choice.ConditionExpression);
+            if (_conditionEvaluator.EvaluateChoice(choice.ConditionExpression))
+            {
+                var choices = _currentConversation.Choices.Keys.ToList();
+                NotifyPlugins(p => p.OnBeforeChoicesDisplay(_pluginContext, choices));
+                dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
+            }
         }
 
         private IEnumerator JumpToLineAndContinue(int targetLineIndex)
@@ -207,564 +476,28 @@ namespace MSpeaker.Runtime
             yield break;
         }
 
-        public void JumpTo(string conversationName)
+        private void UpdatePluginContext()
         {
-            if (ParsedConversations == null || ParsedConversations.Count == 0)
-                throw new InvalidOperationException("No conversation executed，can't exec JumpTo.");
-
-            var conversation = ParsedConversations.Find(c => c.Name == conversationName);
-            if (conversation == null)
-                throw new ArgumentException($"Can't find conversation named \"{conversationName}\" .",
-                    nameof(conversationName));
-
-            SwitchConversation(conversation);
+            _pluginContext.Update(this, _currentConversation, _lineIndex, _isPaused);
         }
 
-        protected virtual IEnumerator DisplayDialogue()
+        private void NotifyPlugins(Action<MspEnginePlugin> action)
         {
-            if (dialogueView == null)
-            {
-                MspDialogueLogger.LogError(-1, "DialogueView 未设置，无法显示对话。", this);
-                yield break;
-            }
-
-            if (_currentConversation?.Lines == null || _lineIndex < 0 || _lineIndex >= _currentConversation.Lines.Count)
-            {
-                MspDialogueLogger.LogError(-1,
-                    $"Invalid line index: {_lineIndex}, conversation has {_currentConversation?.Lines?.Count ?? 0} lines.",
-                    this);
-                _linePlaying = false;
-                yield break;
-            }
-
-            _linePlaying = true;
-
-            var currentLine = _currentConversation.Lines[_lineIndex];
-
-            if (currentLine.LineType == MspLineType.Label)
-            {
-                yield return StartCoroutine(ContinueToNextLine());
-                yield break;
-            }
-
-            if (currentLine.LineType == MspLineType.Goto)
-            {
-                if (_currentConversation.Labels != null &&
-                    _currentConversation.Labels.TryGetValue(currentLine.LabelName, out var targetIndex))
-                {
-                    yield return StartCoroutine(JumpToLineAndContinue(targetIndex));
-                    yield break;
-                }
-                else
-                {
-                    MspDialogueLogger.LogError(-1, $"找不到标签：{currentLine.LabelName}", this);
-                    _linePlaying = false;
-                    yield break;
-                }
-            }
-
-            if (currentLine.LineType == MspLineType.LoopStart)
-            {
-                if (!_loopCounters.ContainsKey(_lineIndex))
-                {
-                    var loopCount = EvaluateLoopCount(currentLine.LoopInfo);
-                    _loopCounters[_lineIndex] = loopCount;
-                }
-
-                if (_loopCounters[_lineIndex] > 0)
-                {
-                    _loopCounters[_lineIndex]--;
-                    _lineIndex++;
-                    if (_lineIndex < _currentConversation.Lines.Count)
-                    {
-                        yield return StartCoroutine(JumpToLineAndContinue(_lineIndex));
-                        yield break;
-                    }
-                }
-                else
-                {
-                    if (currentLine.LoopInfo.LoopEndLineIndex >= 0)
-                    {
-                        yield return StartCoroutine(JumpToLineAndContinue(currentLine.LoopInfo.LoopEndLineIndex));
-                        yield break;
-                    }
-                }
-            }
-
-            if (currentLine.LineType == MspLineType.LoopEnd)
-            {
-                var loopStart = _currentConversation.Lines
-                    .Select((line, idx) => new { line, idx })
-                    .FirstOrDefault(x => x.line.LineType == MspLineType.LoopStart &&
-                                         x.line.LoopInfo?.LoopEndLineIndex == _lineIndex);
-
-                if (loopStart != null && _loopCounters.ContainsKey(loopStart.idx) && _loopCounters[loopStart.idx] > 0)
-                {
-                    yield return StartCoroutine(JumpToLineAndContinue(loopStart.idx));
-                    yield break;
-                }
-                else
-                {
-                    yield return StartCoroutine(ContinueToNextLine());
-                    yield break;
-                }
-            }
-
-            if (currentLine.LineType == MspLineType.IfStart)
-            {
-                var conditionMet = EvaluateCondition(currentLine);
-                var block = _currentConversation.ConditionalBlocks?.GetValueOrDefault(_lineIndex);
-
-                if (block != null)
-                {
-                    if (conditionMet)
-                    {
-                        _skippingConditionalBlock = false;
-                        _conditionalBlockEndIndex = block.EndIfLineIndex;
-                    }
-                    else
-                    {
-                        _skippingConditionalBlock = true;
-                        if (block.ElseLineIndex >= 0)
-                        {
-                            _lineIndex = block.ElseLineIndex + 1;
-                            _skippingConditionalBlock = false;
-                            _conditionalBlockEndIndex = block.EndIfLineIndex;
-                        }
-                        else
-                        {
-                            _lineIndex = block.EndIfLineIndex;
-                            ResetConditionalState();
-                        }
-
-                        yield return StartCoroutine(JumpToLineAndContinue(_lineIndex));
-                        yield break;
-                    }
-                }
-            }
-
-            if (currentLine.LineType == MspLineType.Else)
-            {
-                var block = _currentConversation.ConditionalBlocks?.Values
-                    .FirstOrDefault(b => b.ElseLineIndex == _lineIndex);
-                if (block != null)
-                {
-                    ResetConditionalState();
-                    yield return StartCoroutine(JumpToLineAndContinue(block.EndIfLineIndex));
-                    yield break;
-                }
-            }
-
-            if (currentLine.LineType == MspLineType.EndIf)
-            {
-                ResetConditionalState();
-
-                if (HasChoicesAtLine(_lineIndex))
-                {
-                    var previousLineIndex = FindPreviousNormalLine(_lineIndex - 1);
-                    if (previousLineIndex >= 0)
-                    {
-                        yield return StartCoroutine(JumpToLineAndContinue(previousLineIndex));
-                        yield break;
-                    }
-                }
-
-                yield return StartCoroutine(ContinueToNextLine());
-                yield break;
-            }
-
-            if (_skippingConditionalBlock && _conditionalBlockEndIndex >= 0 && _lineIndex < _conditionalBlockEndIndex)
-            {
-                yield return StartCoroutine(ContinueToNextLine());
-                yield break;
-            }
-
-            TryDisplayChoices();
-            dialogueView.SetView(_currentConversation, _lineIndex);
-
-            if (enginePlugins != null)
-            {
-                foreach (var plugin in enginePlugins)
-                    plugin.Display(_currentConversation, _lineIndex);
-            }
-
-            InvokeFunctions(_currentConversation.Lines[_lineIndex].LineContent?.Invocations);
-
-            yield return new WaitUntil(() => !dialogueView.IsStillDisplaying() || _isPaused);
-
-            if (_isPaused)
-                yield return new WaitUntil(() => !_isPaused);
-
-            _linePlaying = false;
+            if (_plugins == null) return;
+            foreach (var plugin in _plugins)
+                action(plugin);
         }
 
-        /// <summary>
-        /// 评估循环次数（支持变量）
-        /// </summary>
-        protected virtual int EvaluateLoopCount(MspLoopInfo loopInfo)
+        private IEnumerator NotifyPluginsLineDisplay()
         {
-            if (loopInfo == null) return 1;
+            if (_plugins == null) yield break;
 
-            var expression = loopInfo.LoopCountExpression;
-            if (string.IsNullOrEmpty(expression))
-                return loopInfo.LoopCount;
-
-            if (expression.StartsWith("$"))
+            foreach (var plugin in _plugins)
             {
-                var varValue = GetVariableValue(expression);
-                if (varValue != null)
-                {
-                    if (varValue is int intVal) return intVal;
-                    if (int.TryParse(varValue.ToString(), out var parsed)) return parsed;
-                }
-
-                MspDialogueLogger.LogWarning(-1,
-                    $"Loop count variable {expression} not found or invalid, using default value 1.", this);
-                return 1;
+                var result = plugin.OnLineDisplay(_pluginContext);
+                if (result.ShouldWait)
+                    yield return new WaitUntil(() => plugin.IsComplete);
             }
-
-            if (int.TryParse(expression, out var count))
-                return count;
-
-            return loopInfo.LoopCount;
-        }
-
-        /// <summary>
-        /// 评估条件是否满足
-        /// </summary>
-        protected virtual bool EvaluateCondition(MspLine line)
-        {
-            if (line.LineType != MspLineType.IfStart) return false;
-
-            var block = _currentConversation.ConditionalBlocks?.GetValueOrDefault(_lineIndex);
-            if (block == null) return false;
-
-            return EvaluateConditionExpression(block.ConditionExpression);
-        }
-
-        /// <summary>
-        /// 评估条件表达式
-        /// </summary>
-        protected virtual bool EvaluateConditionExpression(string expression)
-        {
-            if (string.IsNullOrWhiteSpace(expression)) return true;
-
-            var conditionInfo = MspArgumentParser.ParseCondition(expression);
-            if (!conditionInfo.IsValid) return false;
-
-            var leftValue = GetVariableValue(conditionInfo.LeftOperand);
-            if (leftValue == null && conditionInfo.IsVariableComparison)
-                return false;
-
-            var rightValue = GetVariableValue(conditionInfo.RightOperand);
-            if (rightValue == null && !IsLiteralValue(conditionInfo.RightOperand))
-            {
-                rightValue = conditionInfo.RightOperand;
-            }
-
-            return CompareValues(leftValue, rightValue, conditionInfo.Operator);
-        }
-
-        /// <summary>
-        /// 获取变量值
-        /// </summary>
-        protected virtual object GetVariableValue(string variableName)
-        {
-            if (string.IsNullOrEmpty(variableName)) return null;
-
-            var key = variableName.TrimStart('$');
-            if (!MspDialogueGlobals.GlobalVariables.TryGetValue(key, out var value))
-                return null;
-
-            if (int.TryParse(value, out var intVal)) return intVal;
-            if (float.TryParse(value, out var floatVal)) return floatVal;
-            if (bool.TryParse(value, out var boolVal)) return boolVal;
-            return value;
-        }
-
-        /// <summary>
-        /// 判断是否是字面值
-        /// </summary>
-        private bool IsLiteralValue(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return false;
-            return int.TryParse(value, out _) ||
-                   float.TryParse(value, out _) ||
-                   bool.TryParse(value, out _) ||
-                   (value.StartsWith("\"") && value.EndsWith("\"")) ||
-                   (value.StartsWith("'") && value.EndsWith("'"));
-        }
-
-        /// <summary>
-        /// 比较两个值
-        /// </summary>
-        private bool CompareValues(object left, object right, string op)
-        {
-            if (left == null || right == null)
-            {
-                return op switch
-                {
-                    "==" => left == right,
-                    "!=" => left != right,
-                    _ => false
-                };
-            }
-
-            if (TryConvertToNumber(left, out var leftNum) && TryConvertToNumber(right, out var rightNum))
-            {
-                return op switch
-                {
-                    "==" => Mathf.Approximately(leftNum, rightNum),
-                    "!=" => !Mathf.Approximately(leftNum, rightNum),
-                    ">" => leftNum > rightNum,
-                    "<" => leftNum < rightNum,
-                    ">=" => leftNum >= rightNum,
-                    "<=" => leftNum <= rightNum,
-                    _ => false
-                };
-            }
-
-            var leftStr = left.ToString();
-            var rightStr = right.ToString();
-            return op switch
-            {
-                "==" => leftStr == rightStr,
-                "!=" => leftStr != rightStr,
-                _ => false
-            };
-        }
-
-        private bool TryConvertToNumber(object value, out float number)
-        {
-            number = 0f;
-            if (value is int i)
-            {
-                number = i;
-                return true;
-            }
-
-            if (value is float f)
-            {
-                number = f;
-                return true;
-            }
-
-            if (value is string s && float.TryParse(s, out var parsed))
-            {
-                number = parsed;
-                return true;
-            }
-
-            return false;
-        }
-
-        protected virtual void InvokeFunctions(Dictionary<int, MspFunctionInvocation> functionInvocations)
-        {
-            if (functionInvocations == null || functionInvocations.Count == 0) return;
-
-            var methods = GetDialogueMethods().ToArray();
-            if (methods.Length == 0) return;
-
-            var insertedOffset = 0;
-            foreach (var kv in functionInvocations.OrderBy(x => x.Key))
-            {
-                var invocation = kv.Value;
-                if (invocation == null || string.IsNullOrEmpty(invocation.FunctionName)) continue;
-
-                foreach (var method in methods)
-                {
-                    if (!string.Equals(method.Name, invocation.FunctionName, StringComparison.Ordinal)) continue;
-
-                    var parameters = method.GetParameters();
-                    var args = BuildMethodArguments(parameters, invocation.Arguments);
-
-                    if (args == null)
-                    {
-                        MspDialogueLogger.LogWarning(-1,
-                            $"Invocation \"{invocation.FunctionName}\" 找到了方法，但参数不匹配。");
-                        continue;
-                    }
-
-                    if (method.ReturnType == typeof(string))
-                    {
-                        var replaced = (string)method.Invoke(null, args);
-                        replaced ??= string.Empty;
-
-                        var lineContent = _currentConversation.Lines[_lineIndex].LineContent;
-                        var insertIndex = Mathf.Clamp(kv.Key + insertedOffset, 0,
-                            (lineContent.Text ?? string.Empty).Length);
-                        lineContent.Text = (lineContent.Text ?? string.Empty).Insert(insertIndex, replaced);
-                        insertedOffset += replaced.Length;
-
-                        dialogueView.SetView(_currentConversation, _lineIndex);
-                    }
-                    else
-                    {
-                        method.Invoke(null, args);
-                    }
-
-                    break;
-                }
-            }
-        }
-
-        /// <summary>
-        /// 构建方法参数数组
-        /// </summary>
-        private object[] BuildMethodArguments(ParameterInfo[] parameters, List<MspFunctionArgument> invocationArgs)
-        {
-            if (parameters.Length == 0)
-            {
-                if (invocationArgs == null || invocationArgs.Count == 0)
-                    return Array.Empty<object>();
-                return null;
-            }
-
-            if (parameters.Length == 1 &&
-                (parameters[0].ParameterType.IsAssignableFrom(typeof(MspDialogueEngineBase)) ||
-                 parameters[0].ParameterType == typeof(MspDialogueEngineBase)))
-            {
-                return new object[] { this };
-            }
-
-            if (invocationArgs == null || invocationArgs.Count != parameters.Length)
-            {
-                return null;
-            }
-
-            var args = new object[parameters.Length];
-            for (var i = 0; i < parameters.Length; i++)
-            {
-                var paramType = parameters[i].ParameterType;
-                var arg = invocationArgs[i];
-
-                if (arg.Type == MspArgumentType.Variable)
-                {
-                    var varName = arg.ConvertedValue?.ToString();
-                    var varValue = GetVariableValue("$" + varName);
-                    if (varValue == null)
-                    {
-                        MspDialogueLogger.LogWarning(-1, $"变量 ${varName} 不存在。");
-                        return null;
-                    }
-
-                    args[i] = ConvertValue(varValue, paramType);
-                }
-                else
-                {
-                    args[i] = ConvertValue(arg.ConvertedValue, paramType);
-                }
-            }
-
-            return args;
-        }
-
-        /// <summary>
-        /// 转换值到指定类型
-        /// </summary>
-        private object ConvertValue(object value, Type targetType)
-        {
-            if (value == null) return null;
-
-            if (targetType.IsAssignableFrom(value.GetType()))
-                return value;
-
-            if (targetType == typeof(string))
-                return value.ToString();
-
-            if (targetType == typeof(int))
-            {
-                if (value is int i) return i;
-                return int.TryParse(value.ToString(), out var parsed) ? parsed : 0;
-            }
-
-            if (targetType == typeof(float))
-            {
-                if (value is float f) return f;
-                return float.TryParse(value.ToString(), out var parsed) ? parsed : 0f;
-            }
-
-            if (targetType == typeof(bool))
-            {
-                if (value is bool b) return b;
-                return bool.TryParse(value.ToString(), out var parsed) && parsed;
-            }
-
-            return Convert.ChangeType(value, targetType);
-        }
-
-        public void TryDisplayNextLine()
-        {
-            if (_linePlaying)
-            {
-                MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but line is still playing.", this);
-                return;
-            }
-
-            if (_currentConversation == null)
-            {
-                MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but no conversation is active.", this);
-                return;
-            }
-
-            if (dialogueView == null)
-            {
-                MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but dialogue view is null.", this);
-                return;
-            }
-
-            if (HasChoicesAtLine(_lineIndex) ||
-                (_lineIndex + 1 < _currentConversation.Lines.Count &&
-                 _currentConversation.Lines[_lineIndex + 1].LineType == MspLineType.EndIf &&
-                 HasChoicesAtLine(_lineIndex + 1)))
-            {
-                return;
-            }
-
-            dialogueView.ClearView(enginePlugins);
-
-            if (_lineIndex < _currentConversation.Lines.Count - 1)
-            {
-                _lineIndex++;
-                StartCoroutine(DisplayDialogue());
-            }
-            else
-            {
-                StopConversation();
-            }
-        }
-
-        protected IEnumerable<MethodInfo> GetDialogueMethods()
-        {
-            var assemblies = new List<Assembly>();
-            var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-
-            if (searchAllAssemblies)
-            {
-                assemblies.AddRange(allAssemblies);
-            }
-            else
-            {
-                foreach (var asm in allAssemblies)
-                {
-                    var asmName = asm.GetName().Name;
-                    if (asmName == "Assembly-CSharp" ||
-                        includedAssemblies.Contains(asmName) ||
-                        asm == Assembly.GetExecutingAssembly())
-                        assemblies.Add(asm);
-                }
-            }
-
-            var methods = new List<MethodInfo>();
-            foreach (var asm in assemblies)
-            {
-                var found = asm.GetTypes()
-                    .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
-                    .Where(m => m.GetCustomAttributes(typeof(MspDialogueFunctionAttribute), false).Length > 0);
-                methods.AddRange(found);
-            }
-
-            return methods;
         }
     }
 }

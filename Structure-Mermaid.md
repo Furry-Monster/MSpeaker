@@ -11,14 +11,27 @@ graph TB
     end
 
     subgraph Runtime["运行时核心层"]
+        subgraph Interfaces["接口层"]
+            IEngine[IMspDialogueEngine]
+            IView[IMspDialogueView]
+            IPlugin[IMspEnginePlugin]
+        end
+
         subgraph Parser["解析层"]
             ParserCore[MspDialogueParser<br/>解析器]
+            ArgParser[MspArgumentParser<br/>参数解析器]
             Models[MspDialogueModels<br/>数据模型]
         end
 
         subgraph Engine["引擎层"]
             EngineBase[MspDialogueEngineBase<br/>引擎基类]
             SimpleEngine[MspSimpleDialogueEngine<br/>简单引擎]
+        end
+
+        subgraph Services["服务层"]
+            ConditionEval[MspConditionEvaluator<br/>条件评估]
+            VarService[MspVariableService<br/>变量服务]
+            FuncInvoker[MspFunctionInvoker<br/>函数调用]
         end
 
         subgraph Views["视图层"]
@@ -29,6 +42,7 @@ graph TB
 
         subgraph Plugins["插件层"]
             PluginBase[MspEnginePlugin<br/>插件基类]
+            PluginContext[MspPluginContext<br/>插件上下文]
             PortraitPlugin[MspPortraitImagePlugin<br/>头像插件]
         end
 
@@ -48,22 +62,28 @@ graph TB
     Importer --> Asset
     Asset --> ParserCore
     ParserCore --> Models
+    ParserCore --> ArgParser
     Models --> EngineBase
     EngineBase --> SimpleEngine
+    EngineBase -.-> IEngine
+    EngineBase --> Services
     EngineBase --> ViewBase
+    ViewBase -.-> IView
     ViewBase --> TypewriterView
     ViewBase --> ChoiceButton
     EngineBase --> PluginBase
+    PluginBase -.-> IPlugin
+    PluginBase --> PluginContext
     PluginBase --> PortraitPlugin
     InputHandler --> EngineBase
-    EngineBase --> Globals
-    EngineBase --> Logger
-    EngineBase --> FunctionAttr
+    Services --> Globals
 
     style Editor fill:#e1f5ff
     style Runtime fill:#fff4e1
+    style Interfaces fill:#e8f5e9
     style Parser fill:#f0f0f0
     style Engine fill:#e8f5e9
+    style Services fill:#fff9c4
     style Views fill:#fce4ec
     style Plugins fill:#f3e5f5
     style Input fill:#fff9c4
@@ -82,42 +102,24 @@ flowchart LR
     F --> G[MspDialogueViewBase]
     G --> H[UI显示]
     F --> I[MspEnginePlugin]
-    F --> J[函数调用系统]
+    F --> J[Services]
     K[MspDialogueInput] --> F
 
     style A fill:#ffebee
     style C fill:#e3f2fd
     style E fill:#f1f8e9
     style H fill:#fff3e0
+    style J fill:#fff9c4
 ```
 
 ## 类关系图
 
 ```mermaid
 classDiagram
-    class MspDialogueAsset {
-        +string Content
-    }
-
-    class MspDialogueParser {
-        +Parse(MspDialogueAsset) List~MspConversation~
-    }
-
-    class MspConversation {
-        +string Name
-        +List~MspLine~ Lines
-        +Dictionary~MspChoice,int~ Choices
-    }
-
-    class MspLine {
-        +string Speaker
-        +Sprite SpeakerImage
-        +MspLineContent LineContent
-    }
-
-    class MspDialogueEngineBase {
-        #MspDialogueViewBase dialogueView
-        #MspEnginePlugin[] enginePlugins
+    class IMspDialogueEngine {
+        <<interface>>
+        +ParsedConversations List~MspConversation~
+        +View IMspDialogueView
         +StartConversation()
         +SwitchConversation()
         +StopConversation()
@@ -125,120 +127,180 @@ classDiagram
         +ResumeConversation()
     }
 
-    class MspSimpleDialogueEngine {
-    }
-
-    class MspDialogueViewBase {
+    class IMspDialogueView {
+        <<interface>>
         +SetView()
         +ClearView()
         +DisplayChoices()
         +IsStillDisplaying()
     }
 
-    class MspTypewriterDialogueView {
-        +float charactersPerSecond
+    class IMspEnginePlugin {
+        <<interface>>
+        +Priority int
+        +IsComplete bool
+        +OnConversationStart()
+        +OnLineDisplay()
+        +OnLineComplete()
+        +OnClear()
+    }
+
+    class IMspPluginContext {
+        <<interface>>
+        +CurrentConversation
+        +CurrentLine
+        +CurrentLineIndex
+        +GetMetadata()
+        +HasMetadata()
+    }
+
+    class IMspConditionEvaluator {
+        <<interface>>
+        +Evaluate(expression) bool
+        +EvaluateChoice(expression) bool
+    }
+
+    class IMspVariableService {
+        <<interface>>
+        +GetValue()
+        +SetValue()
+        +HasVariable()
+    }
+
+    class IMspFunctionInvoker {
+        <<interface>>
+        +Invoke()
+        +ClearCache()
+    }
+
+    class MspDialogueEngineBase {
+        #IMspVariableService _variableService
+        #IMspConditionEvaluator _conditionEvaluator
+        #IMspFunctionInvoker _functionInvoker
+        #MspEnginePlugin[] _plugins
+    }
+
+    class MspDialogueViewBase {
+        #TextMeshProUGUI nameText
+        #TextMeshProUGUI sentenceText
     }
 
     class MspEnginePlugin {
         <<abstract>>
-        +Display()
-        +Clear()
+        +Priority int
+        +IsComplete bool
     }
 
-    class MspDialogueInput {
-        +MspDialogueEngineBase engine
-        +Update()
-    }
-
-    MspDialogueAsset --> MspDialogueParser : 解析
-    MspDialogueParser --> MspConversation : 生成
-    MspConversation --> MspLine : 包含
-    MspDialogueEngineBase <|-- MspSimpleDialogueEngine : 继承
-    MspDialogueEngineBase --> MspDialogueViewBase : 使用
-    MspDialogueViewBase <|-- MspTypewriterDialogueView : 继承
-    MspDialogueEngineBase --> MspEnginePlugin : 管理
-    MspDialogueInput --> MspDialogueEngineBase : 控制
+    MspDialogueEngineBase ..|> IMspDialogueEngine
+    MspDialogueViewBase ..|> IMspDialogueView
+    MspEnginePlugin ..|> IMspEnginePlugin
+    MspDialogueEngineBase --> IMspConditionEvaluator
+    MspDialogueEngineBase --> IMspVariableService
+    MspDialogueEngineBase --> IMspFunctionInvoker
+    MspDialogueEngineBase --> MspEnginePlugin
+    MspEnginePlugin --> IMspPluginContext
 ```
 
-## 执行流程图
+## 插件生命周期
 
 ```mermaid
 sequenceDiagram
-    participant User as 用户
-    participant Input as MspDialogueInput
     participant Engine as MspDialogueEngineBase
-    participant Parser as MspDialogueParser
-    participant View as MspDialogueViewBase
+    participant Context as MspPluginContext
     participant Plugin as MspEnginePlugin
 
-    User->>Input: 按下空格/点击
-    Input->>Engine: TryDisplayNextLine()
-    
-    alt 正在显示效果
-        Engine->>View: SkipViewEffect()
-    else 显示下一行
-        Engine->>Engine: DisplayDialogue()
-        Engine->>View: SetView()
-        Engine->>Plugin: Display()
-        Engine->>Engine: InvokeFunctions()
-        View-->>Engine: IsStillDisplaying()
-        Engine->>Engine: WaitUntil(完成)
+    Engine->>Context: Update(conversation, lineIndex)
+    Engine->>Plugin: OnConversationStart(context)
+
+    loop 每行对话
+        Engine->>Plugin: OnBeforeLineDisplay(context, line)
+        Engine->>Plugin: OnLineDisplay(context)
+        alt 需要等待
+            Plugin-->>Engine: WaitForCompletion
+            Engine->>Engine: WaitUntil(plugin.IsComplete)
+        end
+        Engine->>Plugin: OnLineComplete(context)
     end
 
-    Note over Engine: 对话结束
-    Engine->>View: ClearView()
-    Engine->>Plugin: Clear()
+    opt 显示选项
+        Engine->>Plugin: OnBeforeChoicesDisplay(context, choices)
+        Note over Plugin: 用户选择
+        Engine->>Plugin: OnChoiceSelected(context, choice)
+    end
+
+    Engine->>Plugin: OnConversationEnd(context)
+    Engine->>Plugin: OnClear()
 ```
 
-## 模块依赖关系
+## 服务依赖关系
 
 ```mermaid
 graph TD
-    subgraph Core["核心模块"]
-        Engine[MspDialogueEngineBase]
+    subgraph Engine["引擎"]
+        EngineBase[MspDialogueEngineBase]
     end
 
-    subgraph Data["数据模块"]
-        Asset[MspDialogueAsset]
-        Parser[MspDialogueParser]
-        Models[MspDialogueModels]
+    subgraph Services["服务层"]
+        ConditionEval[MspConditionEvaluator]
+        VarService[MspVariableService]
+        FuncInvoker[MspFunctionInvoker]
     end
 
-    subgraph UI["UI模块"]
-        View[MspDialogueViewBase]
-        Typewriter[MspTypewriterDialogueView]
-        Choice[MspChoiceButton]
+    subgraph Parser["解析层"]
+        ArgParser[MspArgumentParser]
     end
 
-    subgraph Ext["扩展模块"]
-        Plugin[MspEnginePlugin]
-        Input[MspDialogueInput]
-    end
-
-    subgraph Util["工具模块"]
+    subgraph Utils["工具层"]
         Globals[MspDialogueGlobals]
-        Logger[MspDialogueLogger]
-        FunctionAttr[MspDialogueFunctionAttribute]
     end
 
-    Engine --> Asset
-    Engine --> Parser
-    Engine --> Models
-    Engine --> View
-    Engine --> Plugin
-    Engine --> Globals
-    Engine --> Logger
-    Engine --> FunctionAttr
-    View --> Typewriter
-    View --> Choice
-    Input --> Engine
-    Parser --> Models
-    Parser --> Globals
-    Parser --> Logger
+    EngineBase --> ConditionEval
+    EngineBase --> VarService
+    EngineBase --> FuncInvoker
+    ConditionEval --> VarService
+    ConditionEval --> ArgParser
+    FuncInvoker --> VarService
+    VarService -.-> Globals
 
-    style Core fill:#ffcdd2
-    style Data fill:#c8e6c9
-    style UI fill:#bbdefb
-    style Ext fill:#fff9c4
-    style Util fill:#e1bee7
+    style Engine fill:#ffcdd2
+    style Services fill:#fff9c4
+    style Parser fill:#c8e6c9
+    style Utils fill:#e1bee7
+```
+
+## 目录结构
+
+```
+Runtime/
+├── Interfaces/
+│   ├── IMspDialogueEngine.cs
+│   ├── IMspDialogueView.cs
+│   └── IMspEnginePlugin.cs
+├── Parser/
+│   ├── MspArgumentParser.cs
+│   ├── MspDialogueModels.cs
+│   └── MspDialogueParser.cs
+├── Plugins/
+│   ├── MspEnginePlugin.cs
+│   ├── MspPluginContext.cs
+│   └── MspPortraitImagePlugin.cs
+├── Services/
+│   ├── IMspConditionEvaluator.cs
+│   ├── IMspFunctionInvoker.cs
+│   ├── IMspVariableService.cs
+│   ├── MspConditionEvaluator.cs
+│   ├── MspFunctionInvoker.cs
+│   └── MspVariableService.cs
+├── Utils/
+│   ├── MspDialogueFunctionAttribute.cs
+│   ├── MspDialogueGlobals.cs
+│   └── MspDialogueLogger.cs
+├── Views/
+│   ├── MspChoiceButton.cs
+│   ├── MspDialogueViewBase.cs
+│   └── MspTypewriterDialogueView.cs
+├── MspDialogueAsset.cs
+├── MspDialogueEngineBase.cs
+├── MspDialogueInput.cs
+└── MspSimpleDialogueEngine.cs
 ```

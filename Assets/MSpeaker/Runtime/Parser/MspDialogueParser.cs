@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using MSpeaker.Runtime.Utils;
-using UnityEngine;
 
 namespace MSpeaker.Runtime.Parser
 {
@@ -240,12 +239,7 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.ImageInvoke:
                     {
-                        var path = ReplaceGlobalVariables(argInvocationArg);
-                        var sprite = Resources.Load<Sprite>(path);
-                        if (sprite == null)
-                            MspDialogueLogger.LogError(i + 1, $"找不到图片资源：Resources/{path}（{{{{Image(...)}}}}）", asset);
-
-                        currentLine.SpeakerImage = sprite;
+                        currentLine.SpeakerImagePath = ReplaceGlobalVariables(argInvocationArg);
                         continue;
                     }
 
@@ -549,7 +543,7 @@ namespace MSpeaker.Runtime.Parser
         private static bool HasMeaningfulLine(MspLine line, List<MspLineContent> sentenceParts)
         {
             if (!string.IsNullOrEmpty(line.Speaker)) return true;
-            if (line.SpeakerImage != null) return true;
+            if (!string.IsNullOrEmpty(line.SpeakerImagePath)) return true;
             if (sentenceParts.Any(p => !string.IsNullOrWhiteSpace(p.Text))) return true;
             return false;
         }
@@ -570,7 +564,7 @@ namespace MSpeaker.Runtime.Parser
                 var part = sentenceParts[i];
                 foreach (var kv in part.Invocations)
                 {
-                    var adjustedIndex = Mathf.Clamp(offset + kv.Key, 0, int.MaxValue);
+                    var adjustedIndex = Math.Max(0, offset + kv.Key);
                     if (!currentLine.LineContent.Invocations.ContainsKey(adjustedIndex))
                         currentLine.LineContent.Invocations.Add(adjustedIndex, kv.Value);
                 }
