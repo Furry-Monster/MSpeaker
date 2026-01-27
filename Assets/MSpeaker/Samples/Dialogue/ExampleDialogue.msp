@@ -1,267 +1,851 @@
 # ExampleDialogue.msp
-# Comprehensive MSpeaker dialogue example showcasing all features.
-#
-# Syntax overview:
-# - Comment line:            # text
-# - Dialogue / conversation: {{DialogueName(Name)}} or {{ConversationName(Name)}}
-# - Speaker declaration:     [Name]
-# - Plain text line:         any text (can contain inline functions and metadata)
-# - Choice:                  - Text -> TargetDialogueName ## key:value flag
-# - Inline function:         {{FunctionName}} or {{FunctionName(arg1, arg2)}}
-# - Speaker image:           {{Image(Path/Under/Resources)}}
-# - Conditional block:       {{If(condition)}} / {{Else}} / {{EndIf}}
-# - Variable check:          {{IfVar(name, value)}}
-# - Label + jump:            {{Label(name)}} / {{Goto(name)}}
-# - Loop:                    {{Loop(countOrVariable)}}
-# - Line metadata:           ## key:value flag
+# 这是一个完整的视觉小说对话示例，展示了：
+# - 基础对话和说话者切换
+# - 选择分支和好感度系统
+# - 条件判断（根据好感度显示不同内容）
+# - 变量使用（好感度、状态标志）
+# - 函数调用（显示动态内容）
+# - 循环（重复的日常对话）
+# - 标签和跳转（回到之前的对话）
+# - 元数据（标记特殊对话）
+# - 图片切换（角色立绘）
 #
 ###############################################################################
-# ENTRY DIALOGUE
+# 开场 - 初始化游戏状态
 ###############################################################################
 
-{{DialogueName(Welcome)}}
+{{DialogueName(Start)}}
+
+# 初始化游戏变量
+{{SetVariable("shikiAffection", "30")}}
+{{SetVariable("dayCount", "1")}}
+{{SetVariable("hasMagicBook", "false")}}
+{{SetVariable("metShiki", "false")}}
+{{SetVariable("playerName", "Player")}}
+
+[Narrator]
+It's a peaceful morning in the small town.
+
+The cherry blossoms are in full bloom, and the gentle breeze carries their petals through the air.
+
+{{Image(Backgrounds/SchoolEntrance)}}
+
+[Narrator]
+You're a transfer student, arriving at your new school for the first time.
+
+As you walk through the school gates, something unusual catches your eye...
 
 [System]
-Welcome to the MSpeaker dialogue system example!
+* A mysterious girl with long silver hair stands under the cherry tree, reading a book. *
 
-This example will demonstrate all major .msp features.
+{{Image(Characters/Shiki/Normal)}}
 
-- Basic features demo -> BasicFeatures
-- Advanced conditions & choices demo -> AdvancedExample
-- Function call demo -> FunctionExample
-- Advanced loop demo -> LoopAdvancedExample
+[Shiki]
+...Hmm?
 
-###############################################################################
-# BASIC FEATURES
-###############################################################################
+[Shiki]
+Oh, you're new here, aren't you?
 
-{{DialogueName(BasicFeatures)}}
+[Shiki]
+I'm Shiki. Shiki Hoshikawa.
 
-[NPC]
-This is a basic features conversation.
-
-You can use inline function calls to insert dynamic content: {{GetPlayerName()}}
-
-You can also use functions with parameters: {{FormatMessage("Hello", 123)}}
-
-This line shows a speaker portrait loaded from Resources: {{Image(UI/Portraits/NPC_01)}}
-
-- Continue -> ConditionalExample
-- Skip basics -> ConditionalExample
-
-###############################################################################
-# CONDITIONALS (If / IfVar)
-###############################################################################
-
-{{DialogueName(ConditionalExample)}}
+[Shiki]
+Welcome to our school, {{GetPlayerName()}}.
 
 [System]
-Now demonstrating conditional branching with numeric and boolean checks.
+* Shiki smiles warmly, but there's something mysterious about her... *
 
-{{If($score >= 100)}}
-[System]
-Congratulations! Your score is high: $score points!
+- Introduce yourself politely -> PoliteIntroduction
+- Ask about the book she's reading -> AskAboutBook
+- Just nod and walk away -> WalkAway
+
+###############################################################################
+# 礼貌的自我介绍
+###############################################################################
+
+{{DialogueName(PoliteIntroduction)}}
+
+{{SetVariable("metShiki", "true")}}
+{{AddAffection("shikiAffection", 5)}}
+
+[Player]
+Nice to meet you, Shiki. I'm {{GetPlayerName()}}.
+
+[Shiki]
+{{GetPlayerName()}}... That's a nice name.
+
+[Shiki]
+I hope you'll enjoy your time here.
+
+{{If($shikiAffection >= 35)}}
+[Shiki]
+* She seems to be warming up to you quickly. *
 {{Else}}
-[System]
-Your current score is: $score points. Keep trying!
+[Shiki]
+* She gives you a polite but somewhat distant smile. *
 {{EndIf}}
 
-{{IfVar(hasKey, true)}}
+[System]
+Affection with Shiki: $shikiAffection
+
+- Continue to class -> FirstDayClass
+- Ask more about the school -> AskAboutSchool
+
+###############################################################################
+# 询问关于书的问题
+###############################################################################
+
+{{DialogueName(AskAboutBook)}}
+
+{{SetVariable("metShiki", "true")}}
+{{AddAffection("shikiAffection", 10)}}
+
 [Player]
-I found the key!
+That book looks interesting. What are you reading?
+
+[Shiki]
+* Her eyes light up with excitement. *
+
+[Shiki]
+Oh! You noticed?
+
+[Shiki]
+It's a book about... ancient traditions and rituals.
+
+[Shiki]
+I find these kinds of things fascinating.
+
+{{If($shikiAffection >= 40)}}
+[Shiki]
+Would you like to borrow it sometime? I think you might find it interesting too.
 {{Else}}
-[Player]
-I need to find the key.
+[Shiki]
+Maybe I'll tell you more about it later, if you're interested.
 {{EndIf}}
 
-- Continue -> LoopExample
+[System]
+* Shiki seems pleased that you showed interest in her hobby. *
+Affection +10! Current: $shikiAffection
+
+- Continue to class -> FirstDayClass
+- Ask to see the book now -> SeeBookNow
 
 ###############################################################################
-# SIMPLE LOOP
+# 直接走开
 ###############################################################################
 
-{{DialogueName(LoopExample)}}
+{{DialogueName(WalkAway)}}
+
+{{SetVariable("metShiki", "true")}}
+{{AddAffection("shikiAffection", -5)}}
+
+[Player]
+* You simply nod and continue walking. *
+
+[Shiki]
+...I see.
 
 [System]
-Now demonstrating loop functionality with a fixed count.
+* Shiki watches you leave with a slightly disappointed expression. *
+Affection -5. Current: $shikiAffection
+
+[Narrator]
+You head straight to your classroom, missing the opportunity to get to know her better.
+
+- Continue to class -> FirstDayClass
+
+###############################################################################
+# 第一天的课程
+###############################################################################
+
+{{DialogueName(FirstDayClass)}}
+
+{{SetVariable("dayCount", "1")}}
+
+[Narrator]
+The first day of school passes by quickly.
+
+{{If($metShiki == true)}}
+[Narrator]
+During lunch break, you catch a glimpse of Shiki sitting alone in the courtyard, still reading that mysterious book.
+{{Else}}
+[Narrator]
+You spend the day getting familiar with your new classmates and teachers.
+{{EndIf}}
+
+[System]
+Day $dayCount complete.
+
+{{If($shikiAffection >= 40)}}
+[System]
+* You notice Shiki glancing in your direction a few times during class. *
+{{Else}}
+[System]
+* The day ends without any special events. *
+{{EndIf}}
+
+- End of day -> DayEnd
+
+###############################################################################
+# 查看书籍
+###############################################################################
+
+{{DialogueName(SeeBookNow)}}
+
+{{AddAffection("shikiAffection", 5)}}
+{{SetVariable("hasMagicBook", "true")}}
+
+[Shiki]
+Of course! Here, take a look.
+
+[System]
+* Shiki hands you the book. The cover shows intricate symbols and ancient text. *
+
+[Player]
+This is... incredible. These symbols look like they're from another world.
+
+[Shiki]
+* She smiles mysteriously. *
+
+[Shiki]
+You have a good eye. Not many people notice these details.
+
+{{If($shikiAffection >= 50)}}
+[Shiki]
+You know... I think you might be special, {{GetPlayerName()}}.
+{{Else}}
+[Shiki]
+Maybe we can discuss this more another time.
+{{EndIf}}
+
+[System]
+* You feel a strange energy emanating from the book... *
+Affection +5! Current: $shikiAffection
+You obtained: Magic Book
+
+- Continue to class -> FirstDayClass
+
+###############################################################################
+# 询问学校情况
+###############################################################################
+
+{{DialogueName(AskAboutSchool)}}
+
+{{AddAffection("shikiAffection", 3)}}
+
+[Player]
+Could you tell me a bit about this school? I'm still getting used to everything.
+
+[Shiki]
+Sure! What would you like to know?
+
+[Player]
+Well, for starters... are there any interesting clubs or activities?
+
+[Shiki]
+Hmm, let me think...
+
+{{If($shikiAffection >= 40)}}
+[Shiki]
+There's the Occult Research Club. I'm the president, actually.
+[Shiki]
+Would you like to join? We meet after school on Tuesdays and Thursdays.
+{{Else}}
+[Shiki]
+There are quite a few clubs. The Occult Research Club is interesting, though not many people join.
+{{EndIf}}
+
+[System]
+Affection +3! Current: $shikiAffection
+
+- Continue to class -> FirstDayClass
+- Ask about the Occult Research Club -> AskAboutOccultClub
+
+###############################################################################
+# 询问神秘学研究部
+###############################################################################
+
+{{DialogueName(AskAboutOccultClub)}}
+
+{{AddAffection("shikiAffection", 8)}}
+
+[Player]
+The Occult Research Club? That sounds interesting. What do you do there?
+
+[Shiki]
+* Her eyes sparkle with enthusiasm. *
+
+[Shiki]
+We study ancient texts, investigate mysterious phenomena, and sometimes...
+
+[Shiki]
+* She pauses, as if choosing her words carefully. *
+
+[Shiki]
+...we explore things that most people would consider impossible.
+
+[Player]
+Impossible? Like what?
+
+{{If($hasMagicBook == true)}}
+[Shiki]
+Well, since you've seen my book, I can tell you a bit more.
+[Shiki]
+We research magic, rituals, and the supernatural.
+{{Else}}
+[Shiki]
+That's a secret for now. But if you join, you'll find out soon enough.
+{{EndIf}}
+
+[System]
+Affection +8! Current: $shikiAffection
+
+- Join the club -> JoinOccultClub
+- Think about it -> ThinkAboutClub
+
+###############################################################################
+# 加入神秘学研究部
+###############################################################################
+
+{{DialogueName(JoinOccultClub)}}
+
+{{AddAffection("shikiAffection", 15)}}
+{{SetVariable("joinedClub", "true")}}
+
+[Player]
+I'd like to join. It sounds fascinating.
+
+[Shiki]
+Really? That's wonderful!
+
+[Shiki]
+* She claps her hands together, clearly excited. *
+
+[Shiki]
+Welcome to the Occult Research Club, {{GetPlayerName()}}!
+
+[Shiki]
+We meet after school today. I'll show you around our club room.
+
+[System]
+* Shiki's expression brightens significantly. *
+Affection +15! Current: $shikiAffection
+You joined: Occult Research Club
+
+- Continue to class -> FirstDayClass
+
+###############################################################################
+# 考虑是否加入
+###############################################################################
+
+{{DialogueName(ThinkAboutClub)}}
+
+{{AddAffection("shikiAffection", 2)}}
+
+[Player]
+I'll think about it. It does sound interesting.
+
+[Shiki]
+Of course. Take your time.
+
+[Shiki]
+But... I hope you'll decide to join us.
+
+{{If($shikiAffection >= 50)}}
+[Shiki]
+I have a feeling you'd fit in perfectly with our group.
+{{Else}}
+[Shiki]
+It would be nice to have another member.
+{{EndIf}}
+
+[System]
+Affection +2! Current: $shikiAffection
+
+- Continue to class -> FirstDayClass
+
+###############################################################################
+# 一天结束
+###############################################################################
+
+{{DialogueName(DayEnd)}}
+
+[Narrator]
+The school day comes to an end.
+
+{{If($joinedClub == true)}}
+[Narrator]
+As promised, Shiki leads you to the Occult Research Club room.
+{{Image(Backgrounds/ClubRoom)}}
+{{Image(Characters/Shiki/Happy)}}
+
+[Shiki]
+Here we are! This is our club room.
+
+[Shiki]
+* She opens the door to reveal a room filled with books, strange artifacts, and mysterious symbols drawn on the walls. *
+
+[Player]
+Wow... This is amazing.
+
+[Shiki]
+I'm glad you think so. This place is very special to me.
+
+{{If($shikiAffection >= 60)}}
+[Shiki]
+And now... it's special to you too, {{GetPlayerName()}}.
+[System]
+* Shiki's cheeks turn slightly pink. *
+{{Else}}
+[Shiki]
+I hope you'll come to love it as much as I do.
+{{EndIf}}
+{{Else}}
+[Narrator]
+You head home, thinking about the events of the day.
+
+{{If($metShiki == true)}}
+[Narrator]
+The mysterious girl with silver hair... You can't help but wonder about her.
+{{EndIf}}
+{{EndIf}}
+
+[System]
+End of Day $dayCount
+Current Affection with Shiki: $shikiAffection
+
+{{If($shikiAffection >= 60)}}
+[System]
+* Your relationship with Shiki is growing stronger. *
+{{Else}}
+{{If($shikiAffection >= 40)}}
+[System]
+* Shiki seems to be warming up to you. *
+{{Else}}
+[System]
+* Your relationship with Shiki is still developing. *
+{{EndIf}}
+{{EndIf}}
+
+- Next day -> NextDayMorning
+- Check status -> StatusScreen
+
+###############################################################################
+# 第二天早晨
+###############################################################################
+
+{{DialogueName(NextDayMorning)}}
+
+{{SetVariable("dayCount", "2")}}
+
+[Narrator]
+The next morning arrives.
+
+{{Image(Backgrounds/SchoolEntrance)}}
+
+{{If($joinedClub == true)}}
+[Narrator]
+You're looking forward to another day at school, especially the club activities.
+{{Image(Characters/Shiki/Normal)}}
+
+[Shiki]
+Good morning, {{GetPlayerName()}}!
+
+[Shiki]
+Ready for another day?
+
+{{If($shikiAffection >= 60)}}
+[Shiki]
+* She greets you with a warm smile, and you notice she's been waiting for you. *
+{{Else}}
+[Shiki]
+* She seems happy to see you. *
+{{EndIf}}
+{{Else}}
+{{If($metShiki == true)}}
+[Narrator]
+As you arrive at school, you see Shiki again under the cherry tree.
+{{Image(Characters/Shiki/Normal)}}
+
+[Shiki]
+Oh, good morning, {{GetPlayerName()}}.
+
+{{If($shikiAffection >= 40)}}
+[Shiki]
+I was hoping I'd see you today.
+{{Else}}
+[Shiki]
+Nice to see you again.
+{{EndIf}}
+{{Else}}
+[Narrator]
+You arrive at school, ready for another day.
+{{EndIf}}
+{{EndIf}}
+
+- Talk to Shiki -> DailyConversation
+- Go to class -> SecondDayClass
+
+###############################################################################
+# 日常对话（循环示例）
+###############################################################################
+
+{{DialogueName(DailyConversation)}}
+
+[System]
+* You have a chance to talk with Shiki. *
 
 {{Loop(3)}}
-[System]
-This is the {{GetLoopIndex()}}th iteration in the loop.
+[Shiki]
+* She looks at you expectantly, waiting for you to say something. *
 
-[System]
-Loop finished.
-
-- Continue -> LabelExample
-
-###############################################################################
-# LABEL + GOTO
-###############################################################################
-
-{{DialogueName(LabelExample)}}
-
-[System]
-Now demonstrating label and goto functionality.
-
-{{Label(Start)}}
-[Player]
-This is a looping dialogue section.
-[System]
-Do you want to see this section again?
-
-- Loop again -> LabelExample ## tag:loopExample
-- End -> EndExample
-
-###############################################################################
-# ENDING
-###############################################################################
-
-{{DialogueName(EndExample)}}
-
-[System]
-The basic feature demonstration is finished.
-
-Thank you for using the MSpeaker dialogue system.
-
-- Back to entry menu -> Welcome
-
-###############################################################################
-# ADVANCED: NESTED CONDITIONALS + CONDITIONAL CHOICES
-###############################################################################
-
-{{DialogueName(AdvancedExample)}}
-
-# Set initial variables using functions (implementation is in C#).
-{{SetVariable("score", "50")}}
-{{SetVariable("hasKey", "false")}}
-{{SetVariable("level", "1")}}
-
-[System]
-Initial state has been set.
-
-{{If($level >= 5)}}
-[System]
-You are an advanced player!
-{{If($score >= 100)}}
-[System]
-And your score is also high!
+{{If($shikiAffection >= 60)}}
+[Shiki]
+Is there something on your mind, {{GetPlayerName()}}? I'm always here to listen.
+{{Else}}
+[Shiki]
+What would you like to talk about?
 {{EndIf}}
+
+[System]
+Conversation round: {{GetLoopIndex()}} / 3
+{{EndLoop}}
+
+[Shiki]
+* After chatting for a while, Shiki seems satisfied. *
+
+{{AddAffection("shikiAffection", 3)}}
+
+[System]
+* Your conversation with Shiki was pleasant. *
+Affection +3! Current: $shikiAffection
+
+- Continue -> SecondDayClass
+
+###############################################################################
+# 第二天的课程
+###############################################################################
+
+{{DialogueName(SecondDayClass)}}
+
+[Narrator]
+Classes proceed as usual.
+
+{{If($joinedClub == true)}}
+[Narrator]
+During lunch, Shiki invites you to the club room.
+
+{{Image(Backgrounds/ClubRoom)}}
+{{Image(Characters/Shiki/Happy)}}
+
+[Shiki]
+I wanted to show you something special today.
+
+{{If($hasMagicBook == true)}}
+[Shiki]
+Since you've seen my book, I think you're ready for this.
+{{Image(Items/MagicBook)}}
+{{Else}}
+[Shiki]
+I think you might find this interesting.
+{{EndIf}}
+
+[Shiki]
+* She opens a large tome filled with glowing symbols. *
+
+[Player]
+What is this?
+
+[Shiki]
+This is a grimoire. A book of spells and magical knowledge.
+
+{{If($shikiAffection >= 70)}}
+[Shiki]
+I've been wanting to share this with you for a while now.
+[Shiki]
+You see... I'm not just a normal student, {{GetPlayerName()}}.
+{{Else}}
+[Shiki]
+There's more to this world than meets the eye.
+{{EndIf}}
+
+- Ask what she means -> AskAboutMagic
+- Stay silent and observe -> ObserveMagic
+{{Else}}
+[Narrator]
+The day passes without any special events.
+{{EndIf}}
+
+- End of day -> DayEnd
+
+###############################################################################
+# 询问关于魔法
+###############################################################################
+
+{{DialogueName(AskAboutMagic)}}
+
+{{AddAffection("shikiAffection", 10)}}
+
+[Player]
+What do you mean? Are you saying magic is real?
+
+[Shiki]
+* She smiles mysteriously. *
+
+[Shiki]
+What do you think, {{GetPlayerName()}}?
+
+[Shiki]
+* She raises her hand, and a small flame appears in her palm. *
+
+[Player]
+...!
+
+[Shiki]
+I'm a witch. A real witch.
+
+[Shiki]
+And this school... it's a place where magic and the ordinary world intersect.
+
+{{If($shikiAffection >= 80)}}
+[Shiki]
+I've been wanting to tell you for a while now.
+[Shiki]
+I trust you, {{GetPlayerName()}}.
+{{Else}}
+[Shiki]
+Not many people know about this. I hope you can keep it a secret.
+{{EndIf}}
+
+[System]
+* Your world has just expanded in ways you never imagined. *
+Affection +10! Current: $shikiAffection
+
+- Promise to keep the secret -> PromiseSecret
+- Ask to learn magic -> AskToLearnMagic
+
+###############################################################################
+# 观察魔法
+###############################################################################
+
+{{DialogueName(ObserveMagic)}}
+
+{{AddAffection("shikiAffection", 5)}}
+
+[Player]
+* You watch silently as Shiki demonstrates various magical phenomena. *
+
+[Shiki]
+* She notices your focused attention. *
+
+[Shiki]
+You're taking this quite well. Most people would be panicking by now.
+
+[Player]
+It's... incredible. Beautiful, even.
+
+[Shiki]
+* Her expression softens. *
+
+[Shiki]
+I'm glad you think so. Magic is beautiful, but it's also dangerous.
+
+[System]
+Affection +5! Current: $shikiAffection
+
+- Promise to keep the secret -> PromiseSecret
+- Ask to learn magic -> AskToLearnMagic
+
+###############################################################################
+# 承诺保守秘密
+###############################################################################
+
+{{DialogueName(PromiseSecret)}}
+
+{{AddAffection("shikiAffection", 15)}}
+
+[Player]
+Of course. I'll keep your secret, Shiki.
+
+[Shiki]
+* She looks relieved and grateful. *
+
+[Shiki]
+Thank you, {{GetPlayerName()}}. That means a lot to me.
+
+{{If($shikiAffection >= 90)}}
+[Shiki]
+* She moves closer to you. *
+[Shiki]
+You know... I've never trusted anyone like this before.
+[System]
+* Shiki's face is very close to yours now. *
+{{Else}}
+[Shiki]
+I knew I could trust you.
+{{EndIf}}
+
+[System]
+Affection +15! Current: $shikiAffection
+
+- Continue -> MagicRevelationEnd
+
+###############################################################################
+# 请求学习魔法
+###############################################################################
+
+{{DialogueName(AskToLearnMagic)}}
+
+{{AddAffection("shikiAffection", 12)}}
+
+[Player]
+Could you... teach me? I want to understand this world better.
+
+[Shiki]
+* Her eyes widen in surprise, then she smiles. *
+
+[Shiki]
+You want to learn magic?
+
+[Shiki]
+* She thinks for a moment. *
+
+{{If($shikiAffection >= 80)}}
+[Shiki]
+Alright. I'll teach you. But it won't be easy.
+[Shiki]
+Magic requires dedication, focus, and... a special connection.
+{{Else}}
+[Shiki]
+Hmm... I'll consider it. But first, you need to prove you're ready.
+{{EndIf}}
+
+[System]
+Affection +12! Current: $shikiAffection
+
+- Continue -> MagicRevelationEnd
+
+###############################################################################
+# 魔法揭示结束
+###############################################################################
+
+{{DialogueName(MagicRevelationEnd)}}
+
+[Narrator]
+The revelation changes everything.
+
+{{If($shikiAffection >= 90)}}
+[Narrator]
+You and Shiki have grown incredibly close. The bond between you is strong.
+{{Image(Characters/Shiki/Happy)}}
+
+[Shiki]
+* She takes your hand. *
+
+[Shiki]
+{{GetPlayerName()}}... I'm glad I met you.
+
+[Shiki]
+This is the beginning of something special, I can feel it.
+
+[System]
+* Your relationship with Shiki has reached a new level. *
+{{Else}}
+{{If($shikiAffection >= 70)}}
+[Narrator]
+You and Shiki have formed a strong friendship based on trust and understanding.
+{{Image(Characters/Shiki/Normal)}}
+
+[Shiki]
+I'm glad I could share this with you, {{GetPlayerName()}}.
+
+[Shiki]
+There's still so much more I want to show you.
+{{Else}}
+[Narrator]
+You've learned a great secret, and Shiki trusts you with it.
+{{Image(Characters/Shiki/Normal)}}
+
+[Shiki]
+I hope this doesn't change how you see me, {{GetPlayerName()}}.
+
+[Shiki]
+I'm still the same person you met under the cherry tree.
+{{EndIf}}
+{{EndIf}}
+
+[System]
+End of Day $dayCount
+Final Affection: $shikiAffection
+
+{{If($shikiAffection >= 90)}}
+[System]
+* True Ending Unlocked: "The Witch's Companion" *
+{{Else}}
+{{If($shikiAffection >= 70)}}
+[System]
+* Good Ending: "Trusted Friend" *
+{{Else}}
+{{If($shikiAffection >= 50)}}
+[System]
+* Normal Ending: "The Secret Keeper" *
 {{Else}}
 [System]
-You are still a beginner.
-{{If($score < 50)}}
-[System]
-We recommend practicing more to improve your score.
+* Neutral Ending: "Passing Acquaintance" *
+{{EndIf}}
 {{EndIf}}
 {{EndIf}}
 
+- Restart -> Start
+- View status -> StatusScreen
+
+###############################################################################
+# 状态屏幕
+###############################################################################
+
+{{DialogueName(StatusScreen)}}
+
 [System]
-Now demonstrating conditional choices (conditions evaluated in target dialogues).
+=== GAME STATUS ===
 
-- Option 1 (requires score >= 50) -> Option1    ## minScore:50
-- Option 2 (requires score >= 100) -> Option2   ## minScore:100
-- Option 3 (no requirement) -> Option3          ## freeChoice
+Player Name: {{GetPlayerName()}}
+Current Day: $dayCount
 
-- Back to entry menu -> Welcome
+=== CHARACTER STATUS ===
 
-{{DialogueName(Option1)}}
+Shiki Hoshikawa:
+  Affection: $shikiAffection / 100
+  Met: {{IfVar(metShiki, true)}}Yes{{Else}}No{{EndIf}}
+  Club Member: {{IfVar(joinedClub, true)}}Yes{{Else}}No{{EndIf}}
 
-{{If($score >= 50)}}
-[Player]
-I chose option 1.
-[System]
-This option requires at least 50 points.
+=== ITEMS ===
+
+Magic Book: {{IfVar(hasMagicBook, true)}}Obtained{{Else}}Not obtained{{EndIf}}
+
+=== RELATIONSHIP STATUS ===
+
+{{If($shikiAffection >= 90)}}
+Status: True Companion
+* You have formed an unbreakable bond with Shiki. *
 {{Else}}
-[System]
-Sorry, your score is not high enough for this option.
-{{EndIf}}
-
-- Return -> AdvancedExample
-
-{{DialogueName(Option2)}}
-
-{{If($score >= 100)}}
-[Player]
-I chose option 2.
-[System]
-This option requires at least 100 points.
+{{If($shikiAffection >= 70)}}
+Status: Trusted Friend
+* Shiki trusts you completely. *
 {{Else}}
-[System]
-Sorry, your score is not high enough for this option.
-{{EndIf}}
-
-- Return -> AdvancedExample
-
-{{DialogueName(Option3)}}
-
-[Player]
-I chose option 3.
-[System]
-This option has no score requirement.
-
-- Return -> AdvancedExample
-
-###############################################################################
-# FUNCTION CALL EXAMPLES
-###############################################################################
-
-{{DialogueName(FunctionExample)}}
-
-[System]
-Demonstrating various function call patterns:
-
-# Initialize variables used by function examples.
-{{SetVariable("playerName", "Player")}}
-{{SetVariable("count", "3")}}
-
-[Player]
-No-parameter function: {{GetTime()}}
-
-[Player]
-String parameter: {{ShowMessage("Hello World")}}
-
-[Player]
-Number parameter: {{AddScore(10)}}
-
-[Player]
-Boolean parameter: {{SetFlag(true)}}
-
-[Player]
-Multiple parameters: {{CreateItem("Sword", 100, true)}}
-
-[Player]
-Variable parameter: {{UseVariable($playerName)}}
-
-[Player]
-Mixed parameters: {{ProcessData("item", $count, true)}}
-
-- Done -> Welcome
-
-###############################################################################
-# ADVANCED LOOP WITH VARIABLE COUNT
-###############################################################################
-
-{{DialogueName(LoopAdvancedExample)}}
-
-[System]
-Demonstrating combination of loops and conditionals with a variable loop count.
-
-{{SetVariable("loopCount", "5")}}
-
-{{Loop($loopCount)}}
-[System]
-Loop iteration: {{GetLoopIndex()}} / $loopCount
-
-{{If($loopCount >= 5)}}
-[System]
-This is considered a long loop.
+{{If($shikiAffection >= 50)}}
+Status: Good Friend
+* You and Shiki are getting closer. *
 {{Else}}
-[System]
-This is considered a short loop.
+{{If($shikiAffection >= 30)}}
+Status: Acquaintance
+* You've met Shiki, but you're still getting to know each other. *
+{{Else}}
+Status: Stranger
+* You haven't met Shiki yet, or your relationship needs work. *
+{{EndIf}}
+{{EndIf}}
+{{EndIf}}
 {{EndIf}}
 
-[System]
-Loop body completed for this iteration.
-
-- Back to welcome -> Welcome
-
+- Return to game -> DayEnd
+- Restart -> Start
