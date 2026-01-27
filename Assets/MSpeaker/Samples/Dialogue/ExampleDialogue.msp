@@ -1,16 +1,211 @@
 # ExampleDialogue.msp
-# Sample dialogue file. Imported as MspDialogueAsset.
+# Comprehensive MSpeaker dialogue example showcasing all features
+# 
+# Syntax:
+# - Speaker: [Name]
+# - Conversation: {{DialogueName(Name)}} or {{ConversationName(Name)}}
+# - Choice: - Text -> ConversationName
+# - Image: {{Image(Path/Under/Resources)}}
+# - Function: {{FunctionName}} or {{FunctionName(arg1, arg2)}}
+# - Conditional: {{If(condition)}} / {{Else}} / {{EndIf}}
+# - Variable Check: {{IfVar(name, value)}}
+# - Label: {{Label(name)}}
+# - Goto: {{Goto(label)}}
+# - Loop: {{Loop(count)}}
+# - Metadata: ## key:value flag
+# - Comment: # whole line
 
-{{DialogueName(Init)}}
+{{DialogueName(Welcome)}}
+[System]
+Welcome to the MSpeaker dialogue system example!
+
+This example will demonstrate all available features.
+
+- Start Example -> BasicFeatures
+
+{{DialogueName(BasicFeatures)}}
 [NPC]
-Welcome to the MSpeaker dialogue plugin!
-You can inline-insert {{PlayerName}} in a sentence. ## tag:intro
+This is a basic features example.
 
-- Continue -> Next
+You can use function calls to insert dynamic content: {{GetPlayerName()}}
 
-{{DialogueName(Next)}}
-[NPC]
-If you place portraits under a Resources folder, you can switch portrait like this:
-{{Image(avatar)}}
-Alright, end of sample.
+You can also use functions with parameters: {{FormatMessage("Hello", 123)}}
 
+- Continue -> ConditionalExample
+- Skip Basic -> ConditionalExample
+
+{{DialogueName(ConditionalExample)}}
+[System]
+Now demonstrating conditional branching.
+
+{{If($score >= 100)}}
+[System]
+Congratulations! Your score is high: $score points!
+{{Else}}
+[System]
+Your current score is: $score points. Keep trying!
+{{EndIf}}
+
+{{IfVar(hasKey, true)}}
+[Player]
+I found the key!
+{{Else}}
+[Player]
+I need to find the key.
+{{EndIf}}
+
+- Continue -> LoopExample
+
+{{DialogueName(LoopExample)}}
+[System]
+Now demonstrating loop functionality.
+
+{{Loop(3)}}
+[System]
+This is the {{GetLoopIndex()}}th iteration in the loop.
+
+[System]
+Loop ended!
+
+- Continue -> LabelExample
+
+{{DialogueName(LabelExample)}}
+[System]
+Now demonstrating label and goto functionality.
+
+{{Label(start)}}
+[Player]
+This is a looping dialogue.
+[System]
+Do you want to continue?
+
+- Continue Loop -> start
+- End -> EndExample
+
+{{DialogueName(EndExample)}}
+[System]
+Example finished!
+
+Thank you for using the MSpeaker dialogue system.
+
+{{DialogueName(AdvancedExample)}}
+# Advanced example: combining multiple features
+
+[System]
+This is a more complex example showing how to combine various features.
+
+# Set initial variables
+{{SetVariable("score", "50")}}
+{{SetVariable("hasKey", "false")}}
+{{SetVariable("level", "1")}}
+
+[System]
+Initial state set.
+
+{{If($level >= 5)}}
+[System]
+You are an advanced player!
+{{If($score >= 100)}}
+[System]
+And your score is also high!
+{{EndIf}}
+{{Else}}
+[System]
+You are still a beginner.
+{{If($score < 50)}}
+[System]
+Suggest practicing more to improve your score.
+{{EndIf}}
+{{EndIf}}
+
+[System]
+Now demonstrating conditional choices:
+
+- Option 1 (requires score>=50) -> Option1
+- Option 2 (requires score>=100) -> Option2
+- Option 3 (no condition) -> Option3
+
+{{DialogueName(Option1)}}
+{{If($score >= 50)}}
+[Player]
+I chose option 1.
+[System]
+This option requires at least 50 points.
+{{Else}}
+[System]
+Sorry, your score is not high enough for this option.
+{{Goto(AdvancedExample)}}
+{{EndIf}}
+
+- Return -> AdvancedExample
+
+{{DialogueName(Option2)}}
+{{If($score >= 100)}}
+[Player]
+I chose option 2.
+[System]
+This option requires at least 100 points.
+{{Else}}
+[System]
+Sorry, your score is not high enough for this option.
+{{Goto(AdvancedExample)}}
+{{EndIf}}
+
+- Return -> AdvancedExample
+
+{{DialogueName(Option3)}}
+[Player]
+I chose option 3.
+[System]
+This option has no condition restrictions.
+
+- Return -> AdvancedExample
+
+{{DialogueName(FunctionExample)}}
+# Function call examples
+
+[System]
+Demonstrating various function call methods:
+
+[Player]
+No-parameter function: {{GetTime()}}
+
+[Player]
+String parameter: {{ShowMessage("Hello World")}}
+
+[Player]
+Number parameter: {{AddScore(10)}}
+
+[Player]
+Boolean parameter: {{SetFlag(true)}}
+
+[Player]
+Multiple parameters: {{CreateItem("Sword", 100, true)}}
+
+[Player]
+Variable parameter: {{UseVariable($playerName)}}
+
+[Player]
+Mixed parameters: {{ProcessData("item", $count, true)}}
+
+- Done -> Welcome
+
+{{DialogueName(LoopAdvancedExample)}}
+# Advanced loop example
+
+[System]
+Demonstrating combination of loops and conditionals:
+
+{{SetVariable("loopCount", "5")}}
+
+{{Loop($loopCount)}}
+[System]
+Loop iteration: {{GetLoopIndex()}} / $loopCount
+
+{{If($loopCount >= 5)}}
+[System]
+This is a longer loop.
+{{Else}}
+[System]
+This is a shorter loop.
+{{EndIf}}

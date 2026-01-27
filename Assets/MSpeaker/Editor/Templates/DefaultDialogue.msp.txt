@@ -1,15 +1,30 @@
 # MSpeaker Dialogue (.msp)
+# 
 # Syntax:
 # - Speaker: [Name]
-# - Conversation: {{DialogueName(Name)}} (also supports {{ConversationName(Name)}})
+# - Conversation: {{DialogueName(Name)}} or {{ConversationName(Name)}}
 # - Choice: - Text -> ConversationName
 # - Image: {{Image(Path/Under/Resources)}}
-# - Function: {{Foo}}
+# - Function: {{FunctionName}} or {{FunctionName(arg1, arg2)}}
+# - Conditional: {{If(condition)}} / {{Else}} / {{EndIf}}
+# - Variable Check: {{IfVar(name, value)}}
+# - Label: {{Label(name)}}
+# - Goto: {{Goto(label)}}
+# - Loop: {{Loop(count)}}
 # - Metadata: ## key:value flag
+# - Comment: # whole line
 
 {{DialogueName(Init)}}
 [NPC]
 Hello, world!
+
+This is a basic dialogue example.
+
+You can:
+- Use function calls to insert dynamic content: {{GetPlayerName()}}
+- Use conditionals to control flow: {{If($score > 10)}}
+- Use loops to repeat content: {{Loop(3)}}
+- Use labels and goto: {{Label(start)}} and {{Goto(start)}}
 
 - Continue -> Next
 
@@ -17,3 +32,12 @@ Hello, world!
 [Player]
 This is the second conversation.
 
+{{If($hasKey)}}
+[Player]
+I found the key!
+{{Else}}
+[Player]
+I need to find the key.
+{{EndIf}}
+
+- Return -> Init
