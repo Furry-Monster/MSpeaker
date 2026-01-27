@@ -1,43 +1,63 @@
 # MSpeaker Dialogue (.msp)
-# 
-# Syntax:
-# - Speaker: [Name]
-# - Conversation: {{DialogueName(Name)}} or {{ConversationName(Name)}}
-# - Choice: - Text -> ConversationName
-# - Image: {{Image(Path/Under/Resources)}}
-# - Function: {{FunctionName}} or {{FunctionName(arg1, arg2)}}
-# - Conditional: {{If(condition)}} / {{Else}} / {{EndIf}}
-# - Variable Check: {{IfVar(name, value)}}
-# - Label: {{Label(name)}}
-# - Goto: {{Goto(label)}}
-# - Loop: {{Loop(count)}}
-# - Metadata: ## key:value flag
-# - Comment: # whole line
+#
+# This file is a minimal template showing the basic MSpeaker .msp syntax.
+#
+# Syntax overview:
+# - Comment line:            # text
+# - Dialogue / conversation: {{DialogueName(Name)}} or {{ConversationName(Name)}}
+# - Speaker declaration:     [Name]
+# - Plain text line:         any text (can contain inline functions and metadata)
+# - Choice:                  - Text -> TargetDialogueName ## key:value flag
+# - Inline function:         {{FunctionName}} or {{FunctionName(arg1, arg2)}}
+# - Speaker image:           {{Image(Path/Under/Resources)}}
+# - Conditional block:       {{If(condition)}} / {{Else}} / {{EndIf}}
+# - Variable check:          {{IfVar(name, value)}}
+# - Label + jump:            {{Label(name)}} / {{Goto(name)}}
+# - Loop:                    {{Loop(countOrVariable)}}
+# - Line metadata:           ## key:value flag
+#
+###############################################################################
+# START DIALOGUE
+###############################################################################
 
 {{DialogueName(Init)}}
+
+[System]
+Welcome to the MSpeaker dialogue template.
+
+This file shows how to structure a simple dialogue.
+
+- Start conversation -> BasicIntro
+
+###############################################################################
+# BASIC INTRODUCTION
+###############################################################################
+
+{{DialogueName(BasicIntro)}}
+
 [NPC]
-Hello, world!
+Hello, {{GetPlayerName()}}!
 
-This is a basic dialogue example.
+This is a basic dialogue line. It can span multiple lines.
 
-You can:
-- Use function calls to insert dynamic content: {{GetPlayerName()}}
-- Use conditionals to control flow: {{If($score > 10)}}
-- Use loops to repeat content: {{Loop(3)}}
-- Use labels and goto: {{Label(start)}} and {{Goto(start)}}
+- Continue -> ConditionalExample
 
-- Continue -> Next
+###############################################################################
+# SIMPLE CONDITIONAL EXAMPLE
+###############################################################################
 
-{{DialogueName(Next)}}
+{{DialogueName(ConditionalExample)}}
+
+[System]
+Now we will show a simple conditional branch.
+
+{{If($hasKey == true)}}
 [Player]
-This is the second conversation.
-
-{{If($hasKey)}}
-[Player]
-I found the key!
+I already found the key.
 {{Else}}
 [Player]
-I need to find the key.
+I still need to find the key.
 {{EndIf}}
 
-- Return -> Init
+- Back to start -> Init
+
