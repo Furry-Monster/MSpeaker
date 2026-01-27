@@ -79,7 +79,7 @@ This is a looping dialogue.
 [System]
 Do you want to continue?
 
-- Continue Loop -> start
+- Continue Loop -> LabelExample
 - End -> EndExample
 
 {{DialogueName(EndExample)}}
@@ -134,7 +134,6 @@ This option requires at least 50 points.
 {{Else}}
 [System]
 Sorry, your score is not high enough for this option.
-{{Goto(AdvancedExample)}}
 {{EndIf}}
 
 - Return -> AdvancedExample
@@ -148,7 +147,6 @@ This option requires at least 100 points.
 {{Else}}
 [System]
 Sorry, your score is not high enough for this option.
-{{Goto(AdvancedExample)}}
 {{EndIf}}
 
 - Return -> AdvancedExample
@@ -166,6 +164,10 @@ This option has no condition restrictions.
 
 [System]
 Demonstrating various function call methods:
+
+# Initialize variables used by function examples
+{{SetVariable("playerName", "Player")}}
+{{SetVariable("count", "3")}}
 
 [Player]
 No-parameter function: {{GetTime()}}

@@ -309,9 +309,38 @@ namespace MSpeaker.Runtime
 
             if (currentLine.LineType == MspLineType.EndIf)
             {
-                // EndIf 行不显示，继续下一行
+                // EndIf 行不显示，检查是否有 Choice 锚定到 EndIf 行
                 _skippingConditionalBlock = false;
                 _conditionalBlockEndIndex = -1;
+                
+                // 检查当前行（EndIf 行）是否有 Choice 锚定
+                var endifLineIndex = _lineIndex;
+                if (_currentConversation?.Choices != null)
+                {
+                    var hasChoices = _currentConversation.Choices.Any(x => x.Value == endifLineIndex);
+                    if (hasChoices)
+                    {
+                        // 有 Choice 锚定到 EndIf 行，显示 EndIf 之前的最后一行内容，然后显示 Choice
+                        // 找到 EndIf 之前的最后一个有内容的行
+                        var previousLineIndex = _lineIndex - 1;
+                        while (previousLineIndex >= 0)
+                        {
+                            var prevLine = _currentConversation.Lines[previousLineIndex];
+                            // 跳过特殊类型的行，找到最后一个普通行
+                            if (prevLine.LineType == MspLineType.Normal && 
+                                !string.IsNullOrWhiteSpace(prevLine.LineContent?.Text))
+                            {
+                                _lineIndex = previousLineIndex;
+                                _linePlaying = false;
+                                StartCoroutine(DisplayDialogue());
+                                yield break;
+                            }
+                            previousLineIndex--;
+                        }
+                    }
+                }
+                
+                // 没有 Choice，继续下一行
                 _linePlaying = false;
                 TryDisplayNextLine();
                 yield break;
@@ -326,8 +355,10 @@ namespace MSpeaker.Runtime
             }
 
             // 显示选择（如果有）
+            // 检查当前行是否有 Choice，或者检查 EndIf 行是否有 Choice（如果当前行是 EndIf 之前的最后一行）
             if (_currentConversation?.Choices is { Count: > 0 })
             {
+                // 先检查当前行是否有 Choice
                 var foundChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == _lineIndex);
                 if (foundChoice.Key != null && _lineIndex == foundChoice.Value)
                 {
@@ -336,6 +367,28 @@ namespace MSpeaker.Runtime
                         EvaluateConditionExpression(foundChoice.Key.ConditionExpression))
                     {
                         dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
+                    }
+                }
+                else
+                {
+                    // 如果当前行没有 Choice，检查下一行是否是 EndIf 行，如果是，检查 EndIf 行是否有 Choice
+                    var nextLineIndex = _lineIndex + 1;
+                    if (nextLineIndex < _currentConversation.Lines.Count)
+                    {
+                        var nextLine = _currentConversation.Lines[nextLineIndex];
+                        if (nextLine.LineType == MspLineType.EndIf)
+                        {
+                            var endifChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == nextLineIndex);
+                            if (endifChoice.Key != null && nextLineIndex == endifChoice.Value)
+                            {
+                                // 检查选择的条件
+                                if (string.IsNullOrEmpty(endifChoice.Key.ConditionExpression) ||
+                                    EvaluateConditionExpression(endifChoice.Key.ConditionExpression))
+                                {
+                                    dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -702,8 +755,22 @@ namespace MSpeaker.Runtime
             }
 
             // 检查是否有 Choice 需要显示
-            var hasChoices = _currentConversation?.Choices != null && 
-                            _currentConversation.Choices.Any(x => x.Value == _lineIndex);
+            // 检查当前行是否有 Choice，或者检查下一行是否是 EndIf 行，如果是，检查 EndIf 行是否有 Choice
+            var hasChoices = false;
+            if (_currentConversation?.Choices != null)
+            {
+                hasChoices = _currentConversation.Choices.Any(x => x.Value == _lineIndex);
+                
+                // 如果当前行没有 Choice，检查下一行是否是 EndIf 行，如果是，检查 EndIf 行是否有 Choice
+                if (!hasChoices && _lineIndex + 1 < _currentConversation.Lines.Count)
+                {
+                    var nextLine = _currentConversation.Lines[_lineIndex + 1];
+                    if (nextLine.LineType == MspLineType.EndIf)
+                    {
+                        hasChoices = _currentConversation.Choices.Any(x => x.Value == _lineIndex + 1);
+                    }
+                }
+            }
             
             // 如果有 Choice，不继续下一行，等待用户选择
             if (hasChoices)
