@@ -15,11 +15,11 @@ namespace MSpeaker.Runtime
     {
         protected MspEnginePlugin[] enginePlugins;
 
-        public UnityEvent PersistentOnConversationStart = new UnityEvent();
-        public UnityEvent PersistentOnConversationEnd = new UnityEvent();
+        public UnityEvent PersistentOnConversationStart = new();
+        public UnityEvent PersistentOnConversationEnd = new();
 
-        [HideInInspector] public UnityEvent OnConversationStart = new UnityEvent();
-        [HideInInspector] public UnityEvent OnConversationEnd = new UnityEvent();
+        [HideInInspector] public UnityEvent OnConversationStart = new();
+        [HideInInspector] public UnityEvent OnConversationEnd = new();
 
         public List<MspConversation> ParsedConversations { get; protected set; }
         protected MspConversation _currentConversation;
@@ -29,17 +29,18 @@ namespace MSpeaker.Runtime
         protected bool _isPaused;
         private Coroutine _displayCoroutine;
 
-        public UnityEvent OnConversationPaused = new UnityEvent();
-        public UnityEvent OnConversationResumed = new UnityEvent();
+        public UnityEvent OnConversationPaused = new();
+        public UnityEvent OnConversationResumed = new();
 
-        [Header("Dialogue Views")]
-        [SerializeField] protected MspDialogueViewBase dialogueView;
+        [Header("Dialogue Views")] [SerializeField]
+        protected MspDialogueViewBase dialogueView;
 
         public MspDialogueViewBase View => dialogueView;
 
-        [Header("Function Invocations")]
-        [SerializeField] private bool searchAllAssemblies;
-        [SerializeField] private List<string> includedAssemblies = new List<string>();
+        [Header("Function Invocations")] [SerializeField]
+        private bool searchAllAssemblies;
+
+        [SerializeField] private List<string> includedAssemblies = new();
 
         public void StartConversation(MspDialogueAsset dialogueAsset, int startIndex = 0)
         {
@@ -111,11 +112,12 @@ namespace MSpeaker.Runtime
         public void JumpTo(string conversationName)
         {
             if (ParsedConversations == null || ParsedConversations.Count == 0)
-                throw new InvalidOperationException("没有正在进行的对话，无法 JumpTo。");
+                throw new InvalidOperationException("No conversation executed，can't exec JumpTo.");
 
-            MspConversation conversation = ParsedConversations.Find(c => c.Name == conversationName);
+            var conversation = ParsedConversations.Find(c => c.Name == conversationName);
             if (conversation == null)
-                throw new ArgumentException($"未找到名为 \"{conversationName}\" 的会话。", nameof(conversationName));
+                throw new ArgumentException($"Can't find conversation named \"{conversationName}\" .",
+                    nameof(conversationName));
 
             SwitchConversation(conversation);
         }
@@ -130,7 +132,7 @@ namespace MSpeaker.Runtime
 
             _linePlaying = true;
 
-            if (_currentConversation?.Choices != null && _currentConversation.Choices.Count > 0)
+            if (_currentConversation?.Choices is { Count: > 0 })
             {
                 var foundChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == _lineIndex);
                 if (foundChoice.Key != null && _lineIndex == foundChoice.Value)
@@ -141,7 +143,7 @@ namespace MSpeaker.Runtime
 
             if (enginePlugins != null)
             {
-                foreach (MspEnginePlugin plugin in enginePlugins)
+                foreach (var plugin in enginePlugins)
                     plugin.Display(_currentConversation, _lineIndex);
             }
 
@@ -159,31 +161,31 @@ namespace MSpeaker.Runtime
         {
             if (functionInvocations == null || functionInvocations.Count == 0) return;
 
-            MethodInfo[] methods = GetDialogueMethods().ToArray();
+            var methods = GetDialogueMethods().ToArray();
             if (methods.Length == 0) return;
 
             // 依次按索引执行，保证字符串插入顺序稳定
-            int insertedOffset = 0;
+            var insertedOffset = 0;
             foreach (var kv in functionInvocations.OrderBy(x => x.Key))
             {
-                string invocation = kv.Value?.Trim();
+                var invocation = kv.Value?.Trim();
                 if (string.IsNullOrEmpty(invocation)) continue;
 
                 // 暂不支持行内传参形态 {{Foo(a,b)}}；保留括号部分会导致找不到方法
-                int parenIndex = invocation.IndexOf('(');
+                var parenIndex = invocation.IndexOf('(');
                 if (parenIndex >= 0)
                 {
                     MspDialogueLogger.LogWarning(-1, $"暂不支持带参数的行内 invocation：{{{{{invocation}}}}}（仅支持 {{Foo}}）");
                     continue;
                 }
 
-                foreach (MethodInfo method in methods)
+                foreach (var method in methods)
                 {
                     if (!string.Equals(method.Name, invocation, StringComparison.Ordinal))
                         continue;
 
-                    object[] args = null;
-                    ParameterInfo[] parameters = method.GetParameters();
+                    object[] args;
+                    var parameters = method.GetParameters();
                     if (parameters.Length == 1 && parameters[0].ParameterType.IsInstanceOfType(this))
                         args = new object[] { this };
                     else if (parameters.Length == 0)
@@ -197,11 +199,12 @@ namespace MSpeaker.Runtime
 
                     if (method.ReturnType == typeof(string))
                     {
-                        string replaced = (string)method.Invoke(null, args);
+                        var replaced = (string)method.Invoke(null, args);
                         replaced ??= string.Empty;
 
                         var lineContent = _currentConversation.Lines[_lineIndex].LineContent;
-                        int insertIndex = Mathf.Clamp(kv.Key + insertedOffset, 0, (lineContent.Text ?? string.Empty).Length);
+                        var insertIndex = Mathf.Clamp(kv.Key + insertedOffset, 0,
+                            (lineContent.Text ?? string.Empty).Length);
                         lineContent.Text = (lineContent.Text ?? string.Empty).Insert(insertIndex, replaced);
                         insertedOffset += replaced.Length;
 
@@ -239,7 +242,7 @@ namespace MSpeaker.Runtime
         protected IEnumerable<MethodInfo> GetDialogueMethods()
         {
             var assemblies = new List<Assembly>();
-            Assembly[] allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var allAssemblies = AppDomain.CurrentDomain.GetAssemblies();
 
             if (searchAllAssemblies)
             {
@@ -247,20 +250,20 @@ namespace MSpeaker.Runtime
             }
             else
             {
-                foreach (Assembly asm in allAssemblies)
+                foreach (var asm in allAssemblies)
                 {
-                    string name = asm.GetName().Name;
-                    if (name == "Assembly-CSharp" ||
-                        includedAssemblies.Contains(name) ||
+                    var asmName = asm.GetName().Name;
+                    if (asmName == "Assembly-CSharp" ||
+                        includedAssemblies.Contains(asmName) ||
                         asm == Assembly.GetExecutingAssembly())
                         assemblies.Add(asm);
                 }
             }
 
             var methods = new List<MethodInfo>();
-            foreach (Assembly asm in assemblies)
+            foreach (var asm in assemblies)
             {
-                IEnumerable<MethodInfo> found = asm.GetTypes()
+                var found = asm.GetTypes()
                     .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
                     .Where(m => m.GetCustomAttributes(typeof(MspDialogueFunctionAttribute), false).Length > 0);
                 methods.AddRange(found);
@@ -270,4 +273,3 @@ namespace MSpeaker.Runtime
         }
     }
 }
-

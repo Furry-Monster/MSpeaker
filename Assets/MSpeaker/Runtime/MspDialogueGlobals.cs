@@ -7,7 +7,6 @@ namespace MSpeaker.Runtime
     /// </summary>
     public static class MspDialogueGlobals
     {
-        public static readonly Dictionary<string, string> GlobalVariables = new Dictionary<string, string>();
+        public static readonly Dictionary<string, string> GlobalVariables = new();
     }
 }
-

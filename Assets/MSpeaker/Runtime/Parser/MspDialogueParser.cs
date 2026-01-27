@@ -7,7 +7,7 @@ using UnityEngine;
 namespace MSpeaker.Runtime.Parser
 {
     /// <summary>
-    /// 解析 .msp 文本为对话结构。语法参考 Ibralogue：
+    /// 解析 .msp 文本为对话结构：
     /// - 说话者: [Name]
     /// - 句子: 任意文本（可多行）
     /// - 分支: - Choice -> ConversationName
@@ -19,15 +19,16 @@ namespace MSpeaker.Runtime.Parser
     /// </summary>
     public static class MspDialogueParser
     {
-        private static readonly Regex LineCommentRegex = new Regex(@"^\s*#.*");
-        private static readonly Regex SpeakerRegex = new Regex(@"^\s*\[(.+?)\]\s*$");
-        private static readonly Regex ChoiceRegex = new Regex(@"^\s*-\s*(.+?)\s*->\s*(.+?)\s*$");
-        private static readonly Regex VariableRegex = new Regex(@"\$[a-zA-Z0-9_]+");
+        private static readonly Regex LineCommentRegex = new(@"^\s*#.*");
+        private static readonly Regex SpeakerRegex = new(@"^\s*\[(.+?)\]\s*$");
+        private static readonly Regex ChoiceRegex = new(@"^\s*-\s*(.+?)\s*->\s*(.+?)\s*$");
+        private static readonly Regex VariableRegex = new(@"\$[a-zA-Z0-9_]+");
 
-        private static readonly Regex MetadataRegex = new Regex(@"##.*");
-        private static readonly Regex FunctionRegex = new Regex(@"{{(.+?)}}");
+        private static readonly Regex MetadataRegex = new(@"##.*");
+        private static readonly Regex FunctionRegex = new(@"{{(.+?)}}");
+
         private static readonly Regex ArgumentInvocationLineRegex =
-            new Regex(@"^\s*{{\s*(?<name>[a-zA-Z_][a-zA-Z0-9_]*)\s*\((?<arg>.*)\)\s*}}\s*$");
+            new(@"^\s*{{\s*(?<name>[a-zA-Z_][a-zA-Z0-9_]*)\s*\((?<arg>.*)\)\s*}}\s*$");
 
         private enum Token
         {
@@ -43,9 +44,9 @@ namespace MSpeaker.Runtime.Parser
         {
             if (asset == null) throw new ArgumentNullException(nameof(asset));
 
-            string content = asset.Content ?? string.Empty;
+            var content = asset.Content ?? string.Empty;
             // 兼容 Windows 行尾
-            string[] lines = content.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
+            var lines = content.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
 
             var conversations = new List<MspConversation>();
             var currentConversation = NewConversation("Default");
@@ -53,10 +54,10 @@ namespace MSpeaker.Runtime.Parser
             var sentenceParts = new List<MspLineContent>();
             var currentLine = NewLine();
 
-            for (int i = 0; i < lines.Length; i++)
+            for (var i = 0; i < lines.Length; i++)
             {
-                string raw = lines[i];
-                Token token = GetToken(raw, out string argInvocationName, out string argInvocationArg);
+                var raw = lines[i];
+                var token = GetToken(raw, out var argInvocationName, out var argInvocationArg);
 
                 switch (token)
                 {
@@ -65,7 +66,7 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.DialogueNameInvoke:
                     {
-                        string name = ReplaceGlobalVariables(argInvocationArg);
+                        var name = ReplaceGlobalVariables(argInvocationArg);
 
                         // 如果是文件开头且尚未产生任何有效内容，则直接重命名当前会话
                         if (currentConversation.Name == "Default" &&
@@ -87,8 +88,8 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.ImageInvoke:
                     {
-                        string path = ReplaceGlobalVariables(argInvocationArg);
-                        Sprite sprite = Resources.Load<Sprite>(path);
+                        var path = ReplaceGlobalVariables(argInvocationArg);
+                        var sprite = Resources.Load<Sprite>(path);
                         if (sprite == null)
                             MspDialogueLogger.LogError(i + 1, $"找不到图片资源：Resources/{path}（{{{{Image(...)}}}}）", asset);
 
@@ -98,7 +99,7 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.Speaker:
                     {
-                        string speaker = ReplaceGlobalVariables(ExtractSpeaker(raw));
+                        var speaker = ReplaceGlobalVariables(ExtractSpeaker(raw));
                         if (string.IsNullOrWhiteSpace(speaker))
                             MspDialogueLogger.LogWarning(i + 1, "检测到空的 Speaker 名称。", asset);
 
@@ -119,8 +120,7 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.Choice:
                     {
-                        if (currentConversation.Choices == null)
-                            currentConversation.Choices = new Dictionary<MspChoice, int>();
+                        currentConversation.Choices ??= new Dictionary<MspChoice, int>();
 
                         var (choiceText, targetConversation, metadata) = ParseChoice(raw);
                         var choice = new MspChoice
@@ -131,7 +131,7 @@ namespace MSpeaker.Runtime.Parser
                         };
 
                         // Choice 锚定到“当前行索引”（当前行尚未 flush 时，Lines.Count 就是该行的 index）
-                        int anchorLineIndex = currentConversation.Lines.Count;
+                        var anchorLineIndex = currentConversation.Lines.Count;
                         currentConversation.Choices.Add(choice, anchorLineIndex);
                         continue;
                     }
@@ -139,7 +139,7 @@ namespace MSpeaker.Runtime.Parser
                     case Token.Sentence:
                     default:
                     {
-                        string processed = ReplaceGlobalVariables(RemoveMetadataAndInvocationsFromSentence(raw));
+                        var processed = ReplaceGlobalVariables(RemoveMetadataAndInvocationsFromSentence(raw));
                         if (sentenceParts.Count == 0 && string.IsNullOrWhiteSpace(processed))
                             continue;
 
@@ -178,7 +178,7 @@ namespace MSpeaker.Runtime.Parser
             if (ChoiceRegex.IsMatch(rawLine))
                 return Token.Choice;
 
-            Match argLineMatch = ArgumentInvocationLineRegex.Match(rawLine);
+            var argLineMatch = ArgumentInvocationLineRegex.Match(rawLine);
             if (argLineMatch.Success)
             {
                 invocationName = argLineMatch.Groups["name"].Value?.Trim();
@@ -187,7 +187,6 @@ namespace MSpeaker.Runtime.Parser
                 if (string.Equals(invocationName, "Image", StringComparison.OrdinalIgnoreCase))
                     return Token.ImageInvoke;
 
-                // Ibralogue 文档/测试里用 DialogueName；为了兼容，也支持 ConversationName
                 if (string.Equals(invocationName, "DialogueName", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(invocationName, "ConversationName", StringComparison.OrdinalIgnoreCase))
                     return Token.DialogueNameInvoke;
@@ -198,18 +197,19 @@ namespace MSpeaker.Runtime.Parser
 
         private static string ExtractSpeaker(string rawLine)
         {
-            Match m = SpeakerRegex.Match(rawLine);
+            var m = SpeakerRegex.Match(rawLine);
             return m.Success ? m.Groups[1].Value.Trim() : string.Empty;
         }
 
-        private static (string choiceText, string targetConversation, Dictionary<string, string> metadata) ParseChoice(string rawLine)
+        private static (string choiceText, string targetConversation, Dictionary<string, string> metadata) ParseChoice(
+            string rawLine)
         {
             // 先解析 metadata（不影响 choice 文本）
-            Dictionary<string, string> metadata = GatherMetadata(rawLine);
+            var metadata = GatherMetadata(rawLine);
 
             // 去掉所有 metadata，再按 "->" 分割
-            string lineWithoutMetadata = MetadataRegex.Replace(rawLine, string.Empty).Trim();
-            Match m = ChoiceRegex.Match(lineWithoutMetadata);
+            var lineWithoutMetadata = MetadataRegex.Replace(rawLine, string.Empty).Trim();
+            var m = ChoiceRegex.Match(lineWithoutMetadata);
             if (!m.Success)
                 return (lineWithoutMetadata, string.Empty, metadata);
 
@@ -218,7 +218,7 @@ namespace MSpeaker.Runtime.Parser
 
         private static string RemoveMetadataAndInvocationsFromSentence(string rawLine)
         {
-            string line = rawLine ?? string.Empty;
+            var line = rawLine ?? string.Empty;
 
             // 移除行内 {{...}}（用于插入点/函数调用）
             line = FunctionRegex.Replace(line, string.Empty);
@@ -235,8 +235,8 @@ namespace MSpeaker.Runtime.Parser
 
             return VariableRegex.Replace(line, match =>
             {
-                string key = match.Value.Trim().TrimStart('$');
-                if (MspDialogueGlobals.GlobalVariables.TryGetValue(key, out string value))
+                var key = match.Value.Trim().TrimStart('$');
+                if (MspDialogueGlobals.GlobalVariables.TryGetValue(key, out var value))
                     return value ?? string.Empty;
 
                 MspDialogueLogger.LogWarning(-1, $"检测到变量 ${key}，但 GlobalVariables 中没有对应条目。");
@@ -251,10 +251,10 @@ namespace MSpeaker.Runtime.Parser
 
             foreach (Match match in FunctionRegex.Matches(rawLine))
             {
-                string full = match.Value;
-                int index = rawLine.IndexOf(full, StringComparison.Ordinal);
+                var full = match.Value;
+                var index = rawLine.IndexOf(full, StringComparison.Ordinal);
 
-                string name = full;
+                var name = full;
                 if (name.Length >= 4)
                     name = name.Substring(2, name.Length - 4).Trim();
 
@@ -273,22 +273,22 @@ namespace MSpeaker.Runtime.Parser
 
             foreach (Match match in MetadataRegex.Matches(rawLine))
             {
-                string comment = match.Value.Trim();
+                var comment = match.Value.Trim();
                 comment = comment.Replace("##", "").Trim();
                 if (string.IsNullOrEmpty(comment)) continue;
 
-                foreach (string token in comment.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
+                foreach (var token in comment.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries))
                 {
-                    int colonIndex = token.IndexOf(':');
+                    var colonIndex = token.IndexOf(':');
                     if (colonIndex <= 0 || colonIndex >= token.Length - 1)
                     {
-                        if (!result.ContainsKey(token)) result[token] = token;
+                        result.TryAdd(token, token);
                         continue;
                     }
 
-                    string key = token.Substring(0, colonIndex);
-                    string value = token.Substring(colonIndex + 1);
-                    if (!result.ContainsKey(key)) result[key] = value;
+                    var key = token.Substring(0, colonIndex);
+                    var value = token.Substring(colonIndex + 1);
+                    result.TryAdd(key, value);
                 }
             }
 
@@ -324,7 +324,8 @@ namespace MSpeaker.Runtime.Parser
             return false;
         }
 
-        private static void FlushLineIntoConversation(MspConversation conversation, ref MspLine currentLine, List<MspLineContent> sentenceParts)
+        private static void FlushLineIntoConversation(MspConversation conversation, ref MspLine currentLine,
+            List<MspLineContent> sentenceParts)
         {
             if (!HasMeaningfulLine(currentLine, sentenceParts))
                 return;
@@ -333,13 +334,13 @@ namespace MSpeaker.Runtime.Parser
             currentLine.LineContent.Text = string.Join("\n", sentenceParts.Select(p => p.Text)).TrimEnd('\n');
 
             // 合并 invocation（按文本拼接长度计算偏移）
-            int offset = 0;
-            for (int i = 0; i < sentenceParts.Count; i++)
+            var offset = 0;
+            for (var i = 0; i < sentenceParts.Count; i++)
             {
-                MspLineContent part = sentenceParts[i];
+                var part = sentenceParts[i];
                 foreach (var kv in part.Invocations)
                 {
-                    int adjustedIndex = Mathf.Clamp(offset + kv.Key, 0, int.MaxValue);
+                    var adjustedIndex = Mathf.Clamp(offset + kv.Key, 0, int.MaxValue);
                     if (!currentLine.LineContent.Invocations.ContainsKey(adjustedIndex))
                         currentLine.LineContent.Invocations.Add(adjustedIndex, kv.Value);
                 }
@@ -368,4 +369,3 @@ namespace MSpeaker.Runtime.Parser
         }
     }
 }
-

@@ -4,7 +4,7 @@ using UnityEngine;
 namespace MSpeaker.Runtime.Plugins
 {
     /// <summary>
-    /// Engine 插件：用于在显示每一行时同步更新额外 UI（例如头像、音效等）。
+    /// Engine 插件。
     /// </summary>
     public abstract class MspEnginePlugin : MonoBehaviour
     {
@@ -12,4 +12,3 @@ namespace MSpeaker.Runtime.Plugins
         public abstract void Clear();
     }
 }
-

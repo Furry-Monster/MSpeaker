@@ -35,4 +35,3 @@ namespace MSpeaker.Runtime.Parser
         public Dictionary<string, string> Metadata;
     }
 }
-

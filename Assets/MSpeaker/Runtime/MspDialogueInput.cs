@@ -18,7 +18,7 @@ namespace MSpeaker.Runtime
         {
             if (engine == null) return;
 
-            bool pressed = WasPressedThisFrame();
+            var pressed = WasPressedThisFrame();
 
             if (!pressed) return;
 
@@ -31,31 +31,20 @@ namespace MSpeaker.Runtime
         private bool WasPressedThisFrame()
         {
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
-            // 新输入系统（Project Settings -> Active Input Handling = Input System）
-            bool pressed = false;
+            var pressed = false;
 
             // 键盘
             if (Keyboard.current != null)
             {
-                // 目前仅对常用键做映射（足够解决你的报错并快速可用）
-                switch (advanceKey)
+                pressed = advanceKey switch
                 {
-                    case KeyCode.Space:
-                        pressed = Keyboard.current.spaceKey.wasPressedThisFrame;
-                        break;
-                    case KeyCode.Return:
-                    case KeyCode.KeypadEnter:
-                        pressed = (Keyboard.current.enterKey?.wasPressedThisFrame ?? false) ||
-                                  (Keyboard.current.numpadEnterKey?.wasPressedThisFrame ?? false);
-                        break;
-                    case KeyCode.Escape:
-                        pressed = Keyboard.current.escapeKey.wasPressedThisFrame;
-                        break;
-                    default:
-                        // 其它 KeyCode 在新输入系统里没有一一对应；需要的话我可以加一个更完整的映射表
-                        pressed = Keyboard.current.spaceKey.wasPressedThisFrame;
-                        break;
-                }
+                    KeyCode.Space => Keyboard.current.spaceKey.wasPressedThisFrame,
+                    KeyCode.Return or KeyCode.KeypadEnter =>
+                        (Keyboard.current.enterKey?.wasPressedThisFrame ?? false) ||
+                        (Keyboard.current.numpadEnterKey?.wasPressedThisFrame ?? false),
+                    KeyCode.Escape => Keyboard.current.escapeKey.wasPressedThisFrame,
+                    _ => Keyboard.current.spaceKey.wasPressedThisFrame
+                };
             }
 
             // 鼠标
@@ -82,4 +71,3 @@ namespace MSpeaker.Runtime
         }
     }
 }
-

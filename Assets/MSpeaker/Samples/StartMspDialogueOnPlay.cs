@@ -1,13 +1,16 @@
 using MSpeaker.Runtime;
 using UnityEngine;
 
-public sealed class StartMspDialogueOnPlay : MonoBehaviour
+namespace Samples
 {
-    [SerializeField] private MspSimpleDialogueEngine engine;
-    [SerializeField] private MspDialogueAsset dialogue;
-
-    private void Start()
+    public sealed class StartMspDialogueOnPlay : MonoBehaviour
     {
-        engine.StartConversation(dialogue);
+        [SerializeField] private MspSimpleDialogueEngine engine;
+        [SerializeField] private MspDialogueAsset dialogue;
+
+        private void Start()
+        {
+            engine.StartConversation(dialogue);
+        }
     }
 }

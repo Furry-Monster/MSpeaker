@@ -7,4 +7,3 @@ namespace MSpeaker.Runtime
     {
     }
 }
-

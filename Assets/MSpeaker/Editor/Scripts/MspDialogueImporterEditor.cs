@@ -1,3 +1,4 @@
+using System.IO;
 using UnityEditor;
 using UnityEditor.AssetImporters;
 using UnityEngine;
@@ -14,7 +15,7 @@ namespace MSpeaker.Editor
         {
             base.OnEnable();
             var importer = (MspDialogueImporter)target;
-            _filePreview = System.IO.File.ReadAllText(importer.assetPath);
+            _filePreview = File.ReadAllText(importer.assetPath);
         }
 
         public override void OnInspectorGUI()

@@ -13,7 +13,7 @@ namespace MSpeaker.Editor
         {
             var dialogue = ScriptableObject.CreateInstance<MspDialogueAsset>();
             dialogue.name = Path.GetFileNameWithoutExtension(ctx.assetPath);
-            dialogue.Content = File.ReadAllText(ctx.assetPath, Encoding.UTF8);
+            dialogue.Content = File.ReadAllText(ctx.assetPath ?? "", Encoding.UTF8);
 
             ctx.AddObjectToAsset("Dialogue", dialogue);
             ctx.SetMainObject(dialogue);

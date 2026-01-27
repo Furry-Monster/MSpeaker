@@ -7,7 +7,7 @@ namespace MSpeaker.Runtime.Views
     [RequireComponent(typeof(Button))]
     public sealed class MspChoiceButton : MonoBehaviour
     {
-        public UnityEvent OnChoiceClick = new UnityEvent();
+        public UnityEvent OnChoiceClick = new();
 
         private Button _button;
 
@@ -33,4 +33,3 @@ namespace MSpeaker.Runtime.Views
         }
     }
 }
-

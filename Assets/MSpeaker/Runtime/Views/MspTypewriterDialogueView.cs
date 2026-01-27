@@ -17,7 +17,7 @@ namespace MSpeaker.Runtime.Views
 
         public override void SetView(MspConversation conversation, int lineIndex)
         {
-            if (conversation == null || conversation.Lines == null) return;
+            if (conversation?.Lines == null) return;
             if (lineIndex < 0 || lineIndex >= conversation.Lines.Count) return;
 
             if (nameText != null) nameText.text = conversation.Lines[lineIndex].Speaker ?? string.Empty;
@@ -44,6 +44,7 @@ namespace MSpeaker.Runtime.Views
                 StopCoroutine(_typeCoroutine);
                 _typeCoroutine = null;
             }
+
             _isStillDisplaying = false;
             _fullText = string.Empty;
             base.ClearView(enginePlugins);
@@ -64,8 +65,8 @@ namespace MSpeaker.Runtime.Views
                 yield break;
             }
 
-            float t = 0f;
-            int shown = 0;
+            var t = 0f;
+            var shown = 0;
 
             while (shown < (_fullText?.Length ?? 0))
             {
@@ -76,7 +77,7 @@ namespace MSpeaker.Runtime.Views
                 }
 
                 t += Time.unscaledDeltaTime * charactersPerSecond;
-                int nextShown = Mathf.Clamp(Mathf.FloorToInt(t), 0, _fullText.Length);
+                var nextShown = Mathf.Clamp(Mathf.FloorToInt(t), 0, _fullText.Length);
                 if (nextShown != shown)
                 {
                     shown = nextShown;
@@ -103,4 +104,3 @@ namespace MSpeaker.Runtime.Views
         }
     }
 }
-

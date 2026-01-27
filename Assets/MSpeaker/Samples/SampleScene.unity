@@ -710,7 +710,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1888441105}
-  - component: {fileID: 1888441106}
+  - component: {fileID: 1888441107}
   m_Layer: 5
   m_Name: DialogueView
   m_TagString: Untagged
@@ -739,7 +739,7 @@ RectTransform:
   m_AnchoredPosition: {x: 0.000061035, y: 0}
   m_SizeDelta: {x: 1920, y: 1080}
   m_Pivot: {x: 0.5, y: 0.5}
---- !u!114 &1888441106
+--- !u!114 &1888441107
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -748,9 +748,9 @@ MonoBehaviour:
   m_GameObject: {fileID: 1888441104}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1f38e5fdd2f0c75c39cb01259a90e45b, type: 3}
+  m_Script: {fileID: 11500000, guid: af5542e9474240bb3a7e32c6f48a5e9a, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: MSpeaker.Runtime::MSpeaker.Dialogue.Views.MspDialogueViewBase
+  m_EditorClassIdentifier: MSpeaker.Runtime::MSpeaker.Runtime.Views.MspTypewriterDialogueView
   nameText: {fileID: 1930275919}
   sentenceText: {fileID: 1799554165}
   choiceButtonHolder: {fileID: 1888441105}
@@ -761,6 +761,7 @@ MonoBehaviour:
   OnLineComplete:
     m_PersistentCalls:
       m_Calls: []
+  charactersPerSecond: 40
 --- !u!1 &1930275917
 GameObject:
   m_ObjectHideFlags: 0
@@ -961,7 +962,7 @@ MonoBehaviour:
   OnConversationResumed:
     m_PersistentCalls:
       m_Calls: []
-  dialogueView: {fileID: 1888441106}
+  dialogueView: {fileID: 1888441107}
   searchAllAssemblies: 0
   includedAssemblies: []
 --- !u!114 &1947171741

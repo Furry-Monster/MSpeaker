@@ -18,7 +18,7 @@ namespace MSpeaker.Runtime.Plugins
             if (portraitImage == null || conversation?.Lines == null) return;
             if (lineIndex < 0 || lineIndex >= conversation.Lines.Count) return;
 
-            Sprite sprite = conversation.Lines[lineIndex].SpeakerImage;
+            var sprite = conversation.Lines[lineIndex].SpeakerImage;
             portraitImage.sprite = sprite;
 
             if (hideWhenNull)
@@ -33,4 +33,3 @@ namespace MSpeaker.Runtime.Plugins
         }
     }
 }
-

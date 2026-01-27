@@ -16,23 +16,23 @@ namespace MSpeaker.Runtime.Views
         protected bool _isStillDisplaying;
         protected bool _isPaused;
 
-        [Header("Choice UI")]
-        [SerializeField] protected Transform choiceButtonHolder;
+        [Header("Choice UI")] [SerializeField] protected Transform choiceButtonHolder;
         [SerializeField] protected GameObject choiceButtonPrefab;
-        protected readonly List<MspChoiceButton> _choiceButtonInstances = new List<MspChoiceButton>();
+        protected readonly List<MspChoiceButton> _choiceButtonInstances = new();
 
-        public UnityEvent OnSetView = new UnityEvent();
-        public UnityEvent OnLineComplete = new UnityEvent();
+        public UnityEvent OnSetView = new();
+        public UnityEvent OnLineComplete = new();
 
         public virtual bool IsStillDisplaying() => _isStillDisplaying;
 
         public virtual void SetView(MspConversation conversation, int lineIndex)
         {
-            if (conversation == null || conversation.Lines == null) return;
+            if (conversation?.Lines == null) return;
             if (lineIndex < 0 || lineIndex >= conversation.Lines.Count) return;
 
             if (nameText != null) nameText.text = conversation.Lines[lineIndex].Speaker ?? string.Empty;
-            if (sentenceText != null) sentenceText.text = conversation.Lines[lineIndex].LineContent?.Text ?? string.Empty;
+            if (sentenceText != null)
+                sentenceText.text = conversation.Lines[lineIndex].LineContent?.Text ?? string.Empty;
 
             OnSetView.Invoke();
             OnLineComplete.Invoke();
@@ -44,17 +44,18 @@ namespace MSpeaker.Runtime.Views
             if (sentenceText != null) sentenceText.text = string.Empty;
 
             if (enginePlugins != null)
-                foreach (MspEnginePlugin plugin in enginePlugins)
+                foreach (var plugin in enginePlugins)
                     plugin.Clear();
 
             if (_choiceButtonInstances.Count > 0)
             {
-                foreach (MspChoiceButton choiceButton in _choiceButtonInstances)
+                foreach (var choiceButton in _choiceButtonInstances)
                 {
                     if (choiceButton == null) continue;
                     choiceButton.OnChoiceClick.RemoveAllListeners();
                     Destroy(choiceButton.gameObject);
                 }
+
                 _choiceButtonInstances.Clear();
             }
         }
@@ -90,10 +91,10 @@ namespace MSpeaker.Runtime.Views
                 return;
             }
 
-            foreach (MspChoice choice in conversation.Choices.Keys.ToList())
+            foreach (var choice in conversation.Choices.Keys.ToList())
             {
-                GameObject instance = Instantiate(choiceButtonPrefab, choiceButtonHolder);
-                MspChoiceButton choiceButton = instance.GetComponent<MspChoiceButton>();
+                var instance = Instantiate(choiceButtonPrefab, choiceButtonHolder);
+                var choiceButton = instance.GetComponent<MspChoiceButton>();
                 if (choiceButton == null)
                 {
                     MspDialogueLogger.LogError(-1,
@@ -102,7 +103,7 @@ namespace MSpeaker.Runtime.Views
                     continue;
                 }
 
-                int conversationIndex = parsedConversations.FindIndex(c => c.Name == choice.LeadingConversationName);
+                var conversationIndex = parsedConversations.FindIndex(c => c.Name == choice.LeadingConversationName);
                 if (conversationIndex < 0)
                 {
                     MspDialogueLogger.LogError(-1,
@@ -111,7 +112,8 @@ namespace MSpeaker.Runtime.Views
                 }
                 else
                 {
-                    choiceButton.OnChoiceClick.AddListener(() => engine.SwitchConversation(parsedConversations[conversationIndex]));
+                    choiceButton.OnChoiceClick.AddListener(() =>
+                        engine.SwitchConversation(parsedConversations[conversationIndex]));
                 }
 
                 // 尝试给按钮文本赋值（优先 TMP）
@@ -123,4 +125,3 @@ namespace MSpeaker.Runtime.Views
         }
     }
 }
-
