@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace MSpeaker.Runtime
+namespace MSpeaker.Runtime.Utils
 {
     internal static class MspDialogueLogger
     {

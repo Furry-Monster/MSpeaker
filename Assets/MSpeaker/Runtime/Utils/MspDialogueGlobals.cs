@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace MSpeaker.Runtime
+namespace MSpeaker.Runtime.Utils
 {
     /// <summary>
     /// 对话系统全局变量：在解析阶段会把 $Key 替换为 Value。

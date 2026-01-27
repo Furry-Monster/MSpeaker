@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
+using MSpeaker.Runtime.Utils;
 using UnityEngine;
 
 namespace MSpeaker.Runtime.Parser
