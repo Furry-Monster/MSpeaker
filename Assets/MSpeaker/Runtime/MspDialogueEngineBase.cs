@@ -30,10 +30,7 @@ namespace MSpeaker.Runtime
         protected bool _isPaused;
         private Coroutine _displayCoroutine;
 
-        // 循环状态：lineIndex -> 剩余循环次数
         private readonly Dictionary<int, int> _loopCounters = new();
-
-        // 条件分支跳过状态：当前是否在跳过条件分支
         private bool _skippingConditionalBlock;
         private int _conditionalBlockEndIndex = -1;
 
@@ -70,15 +67,11 @@ namespace MSpeaker.Runtime
 
             StopConversation();
             _currentConversation = conversation;
-            _lineIndex = 0; // 确保从第一行开始
-            _skippingConditionalBlock = false; // 重置条件分支跳过状态
-            _conditionalBlockEndIndex = -1; // 重置条件分支结束索引
+            _lineIndex = 0;
+            ResetConditionalState();
 
-            // 先移除可能存在的监听器，避免重复添加
-            OnConversationStart.RemoveListener(PersistentOnConversationStart.Invoke);
-            OnConversationEnd.RemoveListener(PersistentOnConversationEnd.Invoke);
-
-            // 然后添加监听器
+            OnConversationStart.RemoveAllListeners();
+            OnConversationEnd.RemoveAllListeners();
             OnConversationStart.AddListener(PersistentOnConversationStart.Invoke);
             OnConversationEnd.AddListener(PersistentOnConversationEnd.Invoke);
 
@@ -102,8 +95,7 @@ namespace MSpeaker.Runtime
             _currentConversation = null;
             _isPaused = false;
             _loopCounters.Clear();
-            _skippingConditionalBlock = false;
-            _conditionalBlockEndIndex = -1;
+            ResetConditionalState();
 
             OnConversationEnd.Invoke();
             OnConversationStart.RemoveAllListeners();
@@ -128,6 +120,86 @@ namespace MSpeaker.Runtime
 
         public bool IsConversationPaused() => _isPaused;
 
+        private void ResetConditionalState()
+        {
+            _skippingConditionalBlock = false;
+            _conditionalBlockEndIndex = -1;
+        }
+
+        private bool HasChoicesAtLine(int lineIndex)
+        {
+            return _currentConversation?.Choices != null &&
+                   _currentConversation.Choices.Any(x => x.Value == lineIndex);
+        }
+
+        private int FindPreviousNormalLine(int startIndex)
+        {
+            for (var i = startIndex; i >= 0; i--)
+            {
+                var line = _currentConversation.Lines[i];
+                if (line.LineType == MspLineType.Normal &&
+                    !string.IsNullOrWhiteSpace(line.LineContent?.Text))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private void TryDisplayChoices()
+        {
+            if (_currentConversation?.Choices is not { Count: > 0 }) return;
+
+            var foundChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == _lineIndex);
+            if (foundChoice.Key != null && _lineIndex == foundChoice.Value)
+            {
+                if (ShouldDisplayChoice(foundChoice.Key))
+                {
+                    dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
+                }
+
+                return;
+            }
+
+            var nextLineIndex = _lineIndex + 1;
+            if (nextLineIndex < _currentConversation.Lines.Count)
+            {
+                var nextLine = _currentConversation.Lines[nextLineIndex];
+                if (nextLine.LineType == MspLineType.EndIf)
+                {
+                    var endifChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == nextLineIndex);
+                    if (endifChoice.Key != null && nextLineIndex == endifChoice.Value)
+                    {
+                        if (ShouldDisplayChoice(endifChoice.Key))
+                        {
+                            dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
+                        }
+                    }
+                }
+            }
+        }
+
+        private bool ShouldDisplayChoice(MspChoice choice)
+        {
+            return string.IsNullOrEmpty(choice.ConditionExpression) ||
+                   EvaluateConditionExpression(choice.ConditionExpression);
+        }
+
+        private IEnumerator JumpToLineAndContinue(int targetLineIndex)
+        {
+            _lineIndex = targetLineIndex;
+            _linePlaying = false;
+            yield return StartCoroutine(DisplayDialogue());
+        }
+
+        private IEnumerator ContinueToNextLine()
+        {
+            _linePlaying = false;
+            TryDisplayNextLine();
+            yield break;
+        }
+
         public void JumpTo(string conversationName)
         {
             if (ParsedConversations == null || ParsedConversations.Count == 0)
@@ -149,37 +221,31 @@ namespace MSpeaker.Runtime
                 yield break;
             }
 
-            // 检查行索引是否有效
             if (_currentConversation?.Lines == null || _lineIndex < 0 || _lineIndex >= _currentConversation.Lines.Count)
             {
-                MspDialogueLogger.LogError(-1, $"Invalid line index: {_lineIndex}, conversation has {_currentConversation?.Lines?.Count ?? 0} lines.", this);
+                MspDialogueLogger.LogError(-1,
+                    $"Invalid line index: {_lineIndex}, conversation has {_currentConversation?.Lines?.Count ?? 0} lines.",
+                    this);
                 _linePlaying = false;
                 yield break;
             }
 
             _linePlaying = true;
 
-            // 处理当前行的特殊类型
             var currentLine = _currentConversation.Lines[_lineIndex];
 
-            // 处理标签
             if (currentLine.LineType == MspLineType.Label)
             {
-                // 标签行不显示，直接继续
-                _linePlaying = false;
-                TryDisplayNextLine();
+                yield return StartCoroutine(ContinueToNextLine());
                 yield break;
             }
 
-            // 处理跳转
             if (currentLine.LineType == MspLineType.Goto)
             {
                 if (_currentConversation.Labels != null &&
                     _currentConversation.Labels.TryGetValue(currentLine.LabelName, out var targetIndex))
                 {
-                    _lineIndex = targetIndex;
-                    _linePlaying = false;
-                    StartCoroutine(DisplayDialogue());
+                    yield return StartCoroutine(JumpToLineAndContinue(targetIndex));
                     yield break;
                 }
                 else
@@ -190,12 +256,10 @@ namespace MSpeaker.Runtime
                 }
             }
 
-            // 处理循环开始
             if (currentLine.LineType == MspLineType.LoopStart)
             {
                 if (!_loopCounters.ContainsKey(_lineIndex))
                 {
-                    // 在运行时评估循环次数（可能是变量）
                     var loopCount = EvaluateLoopCount(currentLine.LoopInfo);
                     _loopCounters[_lineIndex] = loopCount;
                 }
@@ -203,32 +267,25 @@ namespace MSpeaker.Runtime
                 if (_loopCounters[_lineIndex] > 0)
                 {
                     _loopCounters[_lineIndex]--;
-                    // 继续执行循环内的内容（跳过 LoopStart 行本身，继续下一行）
                     _lineIndex++;
                     if (_lineIndex < _currentConversation.Lines.Count)
                     {
-                        _linePlaying = false;
-                        StartCoroutine(DisplayDialogue());
+                        yield return StartCoroutine(JumpToLineAndContinue(_lineIndex));
                         yield break;
                     }
                 }
                 else
                 {
-                    // 循环结束，跳转到循环结束位置
                     if (currentLine.LoopInfo.LoopEndLineIndex >= 0)
                     {
-                        _lineIndex = currentLine.LoopInfo.LoopEndLineIndex;
-                        _linePlaying = false;
-                        StartCoroutine(DisplayDialogue());
+                        yield return StartCoroutine(JumpToLineAndContinue(currentLine.LoopInfo.LoopEndLineIndex));
                         yield break;
                     }
                 }
             }
 
-            // 处理循环结束
             if (currentLine.LineType == MspLineType.LoopEnd)
             {
-                // 查找对应的循环开始
                 var loopStart = _currentConversation.Lines
                     .Select((line, idx) => new { line, idx })
                     .FirstOrDefault(x => x.line.LineType == MspLineType.LoopStart &&
@@ -236,22 +293,16 @@ namespace MSpeaker.Runtime
 
                 if (loopStart != null && _loopCounters.ContainsKey(loopStart.idx) && _loopCounters[loopStart.idx] > 0)
                 {
-                    // 继续循环，跳回循环开始
-                    _lineIndex = loopStart.idx;
-                    _linePlaying = false;
-                    StartCoroutine(DisplayDialogue());
+                    yield return StartCoroutine(JumpToLineAndContinue(loopStart.idx));
                     yield break;
                 }
                 else
                 {
-                    // 循环真正结束，继续下一行
-                    _linePlaying = false;
-                    TryDisplayNextLine();
+                    yield return StartCoroutine(ContinueToNextLine());
                     yield break;
                 }
             }
 
-            // 处理条件分支
             if (currentLine.LineType == MspLineType.IfStart)
             {
                 var conditionMet = EvaluateCondition(currentLine);
@@ -261,31 +312,25 @@ namespace MSpeaker.Runtime
                 {
                     if (conditionMet)
                     {
-                        // 条件满足，执行 If 分支
                         _skippingConditionalBlock = false;
                         _conditionalBlockEndIndex = block.EndIfLineIndex;
                     }
                     else
                     {
-                        // 条件不满足，跳过 If 分支
                         _skippingConditionalBlock = true;
                         if (block.ElseLineIndex >= 0)
                         {
-                            // 有 Else 分支，跳转到 Else
-                            _lineIndex = block.ElseLineIndex + 1; // Else 行本身不显示
+                            _lineIndex = block.ElseLineIndex + 1;
                             _skippingConditionalBlock = false;
                             _conditionalBlockEndIndex = block.EndIfLineIndex;
                         }
                         else
                         {
-                            // 没有 Else 分支，直接跳转到 EndIf
                             _lineIndex = block.EndIfLineIndex;
-                            _skippingConditionalBlock = false;
-                            _conditionalBlockEndIndex = -1;
+                            ResetConditionalState();
                         }
 
-                        _linePlaying = false;
-                        StartCoroutine(DisplayDialogue());
+                        yield return StartCoroutine(JumpToLineAndContinue(_lineIndex));
                         yield break;
                     }
                 }
@@ -293,107 +338,41 @@ namespace MSpeaker.Runtime
 
             if (currentLine.LineType == MspLineType.Else)
             {
-                // Else 行本身不显示，直接跳转到 EndIf
                 var block = _currentConversation.ConditionalBlocks?.Values
                     .FirstOrDefault(b => b.ElseLineIndex == _lineIndex);
                 if (block != null)
                 {
-                    _lineIndex = block.EndIfLineIndex;
-                    _skippingConditionalBlock = false;
-                    _conditionalBlockEndIndex = -1;
-                    _linePlaying = false;
-                    StartCoroutine(DisplayDialogue());
+                    ResetConditionalState();
+                    yield return StartCoroutine(JumpToLineAndContinue(block.EndIfLineIndex));
                     yield break;
                 }
             }
 
             if (currentLine.LineType == MspLineType.EndIf)
             {
-                // EndIf 行不显示，检查是否有 Choice 锚定到 EndIf 行
-                _skippingConditionalBlock = false;
-                _conditionalBlockEndIndex = -1;
-                
-                // 检查当前行（EndIf 行）是否有 Choice 锚定
-                var endifLineIndex = _lineIndex;
-                if (_currentConversation?.Choices != null)
+                ResetConditionalState();
+
+                if (HasChoicesAtLine(_lineIndex))
                 {
-                    var hasChoices = _currentConversation.Choices.Any(x => x.Value == endifLineIndex);
-                    if (hasChoices)
+                    var previousLineIndex = FindPreviousNormalLine(_lineIndex - 1);
+                    if (previousLineIndex >= 0)
                     {
-                        // 有 Choice 锚定到 EndIf 行，显示 EndIf 之前的最后一行内容，然后显示 Choice
-                        // 找到 EndIf 之前的最后一个有内容的行
-                        var previousLineIndex = _lineIndex - 1;
-                        while (previousLineIndex >= 0)
-                        {
-                            var prevLine = _currentConversation.Lines[previousLineIndex];
-                            // 跳过特殊类型的行，找到最后一个普通行
-                            if (prevLine.LineType == MspLineType.Normal && 
-                                !string.IsNullOrWhiteSpace(prevLine.LineContent?.Text))
-                            {
-                                _lineIndex = previousLineIndex;
-                                _linePlaying = false;
-                                StartCoroutine(DisplayDialogue());
-                                yield break;
-                            }
-                            previousLineIndex--;
-                        }
+                        yield return StartCoroutine(JumpToLineAndContinue(previousLineIndex));
+                        yield break;
                     }
                 }
-                
-                // 没有 Choice，继续下一行
-                _linePlaying = false;
-                TryDisplayNextLine();
+
+                yield return StartCoroutine(ContinueToNextLine());
                 yield break;
             }
 
-            // 如果正在跳过条件分支，直接跳过
             if (_skippingConditionalBlock && _conditionalBlockEndIndex >= 0 && _lineIndex < _conditionalBlockEndIndex)
             {
-                _linePlaying = false;
-                TryDisplayNextLine();
+                yield return StartCoroutine(ContinueToNextLine());
                 yield break;
             }
 
-            // 显示选择（如果有）
-            // 检查当前行是否有 Choice，或者检查 EndIf 行是否有 Choice（如果当前行是 EndIf 之前的最后一行）
-            if (_currentConversation?.Choices is { Count: > 0 })
-            {
-                // 先检查当前行是否有 Choice
-                var foundChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == _lineIndex);
-                if (foundChoice.Key != null && _lineIndex == foundChoice.Value)
-                {
-                    // 检查选择的条件
-                    if (string.IsNullOrEmpty(foundChoice.Key.ConditionExpression) ||
-                        EvaluateConditionExpression(foundChoice.Key.ConditionExpression))
-                    {
-                        dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
-                    }
-                }
-                else
-                {
-                    // 如果当前行没有 Choice，检查下一行是否是 EndIf 行，如果是，检查 EndIf 行是否有 Choice
-                    var nextLineIndex = _lineIndex + 1;
-                    if (nextLineIndex < _currentConversation.Lines.Count)
-                    {
-                        var nextLine = _currentConversation.Lines[nextLineIndex];
-                        if (nextLine.LineType == MspLineType.EndIf)
-                        {
-                            var endifChoice = _currentConversation.Choices.FirstOrDefault(x => x.Value == nextLineIndex);
-                            if (endifChoice.Key != null && nextLineIndex == endifChoice.Value)
-                            {
-                                // 检查选择的条件
-                                if (string.IsNullOrEmpty(endifChoice.Key.ConditionExpression) ||
-                                    EvaluateConditionExpression(endifChoice.Key.ConditionExpression))
-                                {
-                                    dialogueView.DisplayChoices(this, _currentConversation, ParsedConversations);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 显示对话内容
+            TryDisplayChoices();
             dialogueView.SetView(_currentConversation, _lineIndex);
 
             if (enginePlugins != null)
@@ -404,15 +383,12 @@ namespace MSpeaker.Runtime
 
             InvokeFunctions(_currentConversation.Lines[_lineIndex].LineContent?.Invocations);
 
-            // 等待视图完成显示效果（如打字机效果）
             yield return new WaitUntil(() => !dialogueView.IsStillDisplaying() || _isPaused);
 
             if (_isPaused)
                 yield return new WaitUntil(() => !_isPaused);
 
             _linePlaying = false;
-            
-            // 注意：这里不会自动继续下一行，需要用户输入（空格/点击）来调用 TryDisplayNextLine()
         }
 
         /// <summary>
@@ -421,30 +397,28 @@ namespace MSpeaker.Runtime
         protected virtual int EvaluateLoopCount(MspLoopInfo loopInfo)
         {
             if (loopInfo == null) return 1;
-            
+
             var expression = loopInfo.LoopCountExpression;
             if (string.IsNullOrEmpty(expression))
-                return loopInfo.LoopCount; // 使用已解析的值
-            
-            // 如果是变量（以 $ 开头），从全局变量获取
+                return loopInfo.LoopCount;
+
             if (expression.StartsWith("$"))
             {
                 var varValue = GetVariableValue(expression);
                 if (varValue != null)
                 {
-                    // 尝试转换为整数
                     if (varValue is int intVal) return intVal;
                     if (int.TryParse(varValue.ToString(), out var parsed)) return parsed;
                 }
-                MspDialogueLogger.LogWarning(-1, $"Loop count variable {expression} not found or invalid, using default value 1.", this);
+
+                MspDialogueLogger.LogWarning(-1,
+                    $"Loop count variable {expression} not found or invalid, using default value 1.", this);
                 return 1;
             }
-            
-            // 如果是数字，直接解析
+
             if (int.TryParse(expression, out var count))
                 return count;
-            
-            // 默认返回已解析的值
+
             return loopInfo.LoopCount;
         }
 
@@ -471,22 +445,16 @@ namespace MSpeaker.Runtime
             var conditionInfo = MspArgumentParser.ParseCondition(expression);
             if (!conditionInfo.IsValid) return false;
 
-            // 获取左操作数的值
             var leftValue = GetVariableValue(conditionInfo.LeftOperand);
             if (leftValue == null && conditionInfo.IsVariableComparison)
-            {
-                // 变量不存在，返回 false
                 return false;
-            }
 
-            // 获取右操作数的值
             var rightValue = GetVariableValue(conditionInfo.RightOperand);
             if (rightValue == null && !IsLiteralValue(conditionInfo.RightOperand))
             {
                 rightValue = conditionInfo.RightOperand;
             }
 
-            // 执行比较
             return CompareValues(leftValue, rightValue, conditionInfo.Operator);
         }
 
@@ -497,20 +465,14 @@ namespace MSpeaker.Runtime
         {
             if (string.IsNullOrEmpty(variableName)) return null;
 
-            // 去掉 $ 前缀
             var key = variableName.TrimStart('$');
+            if (!MspDialogueGlobals.GlobalVariables.TryGetValue(key, out var value))
+                return null;
 
-            // 从全局变量获取
-            if (MspDialogueGlobals.GlobalVariables.TryGetValue(key, out var value))
-            {
-                // 尝试转换为数字或布尔值
-                if (int.TryParse(value, out var intVal)) return intVal;
-                if (float.TryParse(value, out var floatVal)) return floatVal;
-                if (bool.TryParse(value, out var boolVal)) return boolVal;
-                return value;
-            }
-
-            return null;
+            if (int.TryParse(value, out var intVal)) return intVal;
+            if (float.TryParse(value, out var floatVal)) return floatVal;
+            if (bool.TryParse(value, out var boolVal)) return boolVal;
+            return value;
         }
 
         /// <summary>
@@ -541,7 +503,6 @@ namespace MSpeaker.Runtime
                 };
             }
 
-            // 尝试数值比较
             if (TryConvertToNumber(left, out var leftNum) && TryConvertToNumber(right, out var rightNum))
             {
                 return op switch
@@ -556,7 +517,6 @@ namespace MSpeaker.Runtime
                 };
             }
 
-            // 字符串比较
             var leftStr = left.ToString();
             var rightStr = right.ToString();
             return op switch
@@ -598,7 +558,6 @@ namespace MSpeaker.Runtime
             var methods = GetDialogueMethods().ToArray();
             if (methods.Length == 0) return;
 
-            // 依次按索引执行，保证字符串插入顺序稳定
             var insertedOffset = 0;
             foreach (var kv in functionInvocations.OrderBy(x => x.Key))
             {
@@ -609,7 +568,6 @@ namespace MSpeaker.Runtime
                 {
                     if (!string.Equals(method.Name, invocation.FunctionName, StringComparison.Ordinal)) continue;
 
-                    // 构建参数数组
                     var parameters = method.GetParameters();
                     var args = BuildMethodArguments(parameters, invocation.Arguments);
 
@@ -650,13 +608,11 @@ namespace MSpeaker.Runtime
         {
             if (parameters.Length == 0)
             {
-                // 无参数方法：如果调用时也没有参数，返回空数组；如果有参数，说明不匹配
                 if (invocationArgs == null || invocationArgs.Count == 0)
-                    return Array.Empty<object>(); // 无参数方法，返回空数组
-                return null; // 方法无参数但调用时有参数，不匹配
+                    return Array.Empty<object>();
+                return null;
             }
 
-            // 检查是否是引擎参数
             if (parameters.Length == 1 &&
                 (parameters[0].ParameterType.IsAssignableFrom(typeof(MspDialogueEngineBase)) ||
                  parameters[0].ParameterType == typeof(MspDialogueEngineBase)))
@@ -664,20 +620,17 @@ namespace MSpeaker.Runtime
                 return new object[] { this };
             }
 
-            // 检查参数数量是否匹配
             if (invocationArgs == null || invocationArgs.Count != parameters.Length)
             {
                 return null;
             }
 
-            // 转换参数类型
             var args = new object[parameters.Length];
             for (var i = 0; i < parameters.Length; i++)
             {
                 var paramType = parameters[i].ParameterType;
                 var arg = invocationArgs[i];
 
-                // 如果是变量类型，需要从全局变量获取值
                 if (arg.Type == MspArgumentType.Variable)
                 {
                     var varName = arg.ConvertedValue?.ToString();
@@ -709,26 +662,25 @@ namespace MSpeaker.Runtime
             if (targetType.IsAssignableFrom(value.GetType()))
                 return value;
 
-            // 尝试类型转换
             if (targetType == typeof(string))
                 return value.ToString();
 
             if (targetType == typeof(int))
             {
                 if (value is int i) return i;
-                if (int.TryParse(value.ToString(), out var parsed)) return parsed;
+                return int.TryParse(value.ToString(), out var parsed) ? parsed : 0;
             }
 
             if (targetType == typeof(float))
             {
                 if (value is float f) return f;
-                if (float.TryParse(value.ToString(), out var parsed)) return parsed;
+                return float.TryParse(value.ToString(), out var parsed) ? parsed : 0f;
             }
 
             if (targetType == typeof(bool))
             {
                 if (value is bool b) return b;
-                if (bool.TryParse(value.ToString(), out var parsed)) return parsed;
+                return bool.TryParse(value.ToString(), out var parsed) && parsed;
             }
 
             return Convert.ChangeType(value, targetType);
@@ -741,42 +693,24 @@ namespace MSpeaker.Runtime
                 MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but line is still playing.", this);
                 return;
             }
-            
+
             if (_currentConversation == null)
             {
                 MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but no conversation is active.", this);
                 return;
             }
-            
+
             if (dialogueView == null)
             {
                 MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but dialogue view is null.", this);
                 return;
             }
 
-            // 检查是否有 Choice 需要显示
-            // 检查当前行是否有 Choice，或者检查下一行是否是 EndIf 行，如果是，检查 EndIf 行是否有 Choice
-            var hasChoices = false;
-            if (_currentConversation?.Choices != null)
+            if (HasChoicesAtLine(_lineIndex) ||
+                (_lineIndex + 1 < _currentConversation.Lines.Count &&
+                 _currentConversation.Lines[_lineIndex + 1].LineType == MspLineType.EndIf &&
+                 HasChoicesAtLine(_lineIndex + 1)))
             {
-                hasChoices = _currentConversation.Choices.Any(x => x.Value == _lineIndex);
-                
-                // 如果当前行没有 Choice，检查下一行是否是 EndIf 行，如果是，检查 EndIf 行是否有 Choice
-                if (!hasChoices && _lineIndex + 1 < _currentConversation.Lines.Count)
-                {
-                    var nextLine = _currentConversation.Lines[_lineIndex + 1];
-                    if (nextLine.LineType == MspLineType.EndIf)
-                    {
-                        hasChoices = _currentConversation.Choices.Any(x => x.Value == _lineIndex + 1);
-                    }
-                }
-            }
-            
-            // 如果有 Choice，不继续下一行，等待用户选择
-            if (hasChoices)
-            {
-                // 有 Choice 时，不继续下一行，等待用户点击选择按钮
-                // 不要清除视图，保持当前文本和选择按钮显示
                 return;
             }
 
@@ -785,12 +719,10 @@ namespace MSpeaker.Runtime
             if (_lineIndex < _currentConversation.Lines.Count - 1)
             {
                 _lineIndex++;
-                MspDialogueLogger.LogWarning(-1, $"Displaying next line: {_lineIndex} of {_currentConversation.Lines.Count}", this);
                 StartCoroutine(DisplayDialogue());
             }
             else
             {
-                MspDialogueLogger.LogWarning(-1, $"No more lines to display. Stopping conversation. (Line {_lineIndex} of {_currentConversation.Lines.Count})", this);
                 StopConversation();
             }
         }

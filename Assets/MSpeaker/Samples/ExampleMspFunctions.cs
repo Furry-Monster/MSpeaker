@@ -1,6 +1,4 @@
-using MSpeaker.Runtime;
 using MSpeaker.Runtime.Utils;
-using UnityEngine;
 
 namespace Samples
 {
@@ -11,12 +9,6 @@ namespace Samples
     {
         private static int _loopIndex = 0;
         private static int _score = 0;
-
-        [MspDialogueFunction]
-        public static string PlayerName()
-        {
-            return "Player";
-        }
 
         [MspDialogueFunction]
         public static string GetPlayerName()
@@ -39,32 +31,31 @@ namespace Samples
         [MspDialogueFunction]
         public static void ShowMessage(string message)
         {
-            Debug.Log($"[MSpeaker] Message: {message}");
+            // 示例函数：可以在这里实现实际的消息显示逻辑
         }
 
         [MspDialogueFunction]
         public static void AddScore(int points)
         {
             _score += points;
-            Debug.Log($"[MSpeaker] Score increased by {points}. Current score: {_score}");
         }
 
         [MspDialogueFunction]
         public static void SetFlag(bool value)
         {
-            Debug.Log($"[MSpeaker] Flag set to: {value}");
+            // 示例函数：可以在这里实现实际的标志设置逻辑
         }
 
         [MspDialogueFunction]
         public static void CreateItem(string itemName, int value, bool isRare)
         {
-            Debug.Log($"[MSpeaker] Created item: {itemName}, Value: {value}, Rare: {isRare}");
+            // 示例函数：可以在这里实现实际的道具创建逻辑
         }
 
         [MspDialogueFunction]
         public static void UseVariable(string variableName)
         {
-            Debug.Log($"[MSpeaker] Using variable: {variableName}");
+            // 示例函数：可以在这里实现实际的变量使用逻辑
         }
 
         [MspDialogueFunction]
@@ -72,7 +63,7 @@ namespace Samples
         {
             if (process)
             {
-                Debug.Log($"[MSpeaker] Processing {count} items of type {dataType}");
+                // 示例函数：可以在这里实现实际的数据处理逻辑
             }
         }
 
@@ -92,13 +83,6 @@ namespace Samples
         public static void SetVariable(string name, string value)
         {
             MspDialogueGlobals.GlobalVariables[name] = value;
-            Debug.Log($"[MSpeaker] Set variable {name} = {value}");
-        }
-
-        [MspDialogueFunction]
-        public static MspDialogueEngineBase GetEngine(MspDialogueEngineBase engine)
-        {
-            return engine;
         }
     }
 }

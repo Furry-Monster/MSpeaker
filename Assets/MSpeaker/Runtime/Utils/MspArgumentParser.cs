@@ -29,7 +29,6 @@ namespace MSpeaker.Runtime.Utils
             if (string.IsNullOrWhiteSpace(argString))
                 return arguments;
 
-            // 分割参数，考虑引号内的逗号
             var parts = SplitArguments(argString);
 
             foreach (var part in parts)
@@ -38,14 +37,12 @@ namespace MSpeaker.Runtime.Utils
                 if (string.IsNullOrEmpty(trimmed))
                     continue;
 
-                var arg = new MspFunctionArgument
+                arguments.Add(new MspFunctionArgument
                 {
                     RawValue = trimmed,
                     Type = DetectArgumentType(trimmed),
                     ConvertedValue = ConvertArgument(trimmed)
-                };
-
-                arguments.Add(arg);
+                });
             }
 
             return arguments;
@@ -87,7 +84,6 @@ namespace MSpeaker.Runtime.Utils
             switch (type)
             {
                 case MspArgumentType.Variable:
-                    // 变量类型，返回变量名（去掉$）
                     return value.TrimStart('$');
 
                 case MspArgumentType.Boolean:
@@ -100,7 +96,6 @@ namespace MSpeaker.Runtime.Utils
                     return float.Parse(value, CultureInfo.InvariantCulture);
 
                 case MspArgumentType.String:
-                    // 去掉引号
                     if ((value.StartsWith("\"") && value.EndsWith("\"")) ||
                         (value.StartsWith("'") && value.EndsWith("'")))
                         return value.Substring(1, value.Length - 2);
@@ -169,7 +164,6 @@ namespace MSpeaker.Runtime.Utils
 
             expression = expression.Trim();
 
-            // 支持 IfVar 格式：name,value 或 name==value
             if (expression.Contains(','))
             {
                 var parts = expression.Split(',');
@@ -186,7 +180,6 @@ namespace MSpeaker.Runtime.Utils
                 }
             }
 
-            // 支持比较运算符：==, !=, >, <, >=, <=
             var operators = new[] { "==", "!=", ">=", "<=", ">", "<" };
             foreach (var op in operators)
             {
@@ -196,7 +189,6 @@ namespace MSpeaker.Runtime.Utils
                     var left = expression[..index].Trim();
                     var right = expression[(index + op.Length)..].Trim();
 
-                    // 去掉引号
                     if ((right.StartsWith("\"") && right.EndsWith("\"")) ||
                         (right.StartsWith("'") && right.EndsWith("'")))
                         right = right.Substring(1, right.Length - 2);
@@ -212,7 +204,6 @@ namespace MSpeaker.Runtime.Utils
                 }
             }
 
-            // 如果没有运算符，作为布尔变量处理
             return new MspConditionInfo
             {
                 IsValid = true,

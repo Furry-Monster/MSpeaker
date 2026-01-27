@@ -61,7 +61,6 @@ namespace MSpeaker.Runtime.Parser
             if (asset == null) throw new ArgumentNullException(nameof(asset));
 
             var content = asset.Content ?? string.Empty;
-            // 兼容 Windows 行尾
             var lines = content.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n');
 
             var conversations = new List<MspConversation>();
@@ -70,9 +69,7 @@ namespace MSpeaker.Runtime.Parser
             var sentenceParts = new List<MspLineContent>();
             var currentLine = NewLine();
 
-            // 条件分支栈，用于匹配 If/Else/EndIf
             var conditionalStack = new Stack<MspConditionalBlock>();
-            // 循环栈，用于匹配 Loop
             var loopStack = new Stack<MspLoopInfo>();
 
             for (var i = 0; i < lines.Length; i++)
@@ -86,36 +83,13 @@ namespace MSpeaker.Runtime.Parser
                         continue;
 
                     case Token.IfStart:
-                    {
-                        FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
-                        var condition = argInvocationArg;
-                        var block = new MspConditionalBlock
-                        {
-                            ConditionType = MspConditionType.If,
-                            ConditionExpression = condition,
-                            IfStartLineIndex = currentConversation.Lines.Count,
-                            ElseLineIndex = -1,
-                            EndIfLineIndex = -1
-                        };
-                        conditionalStack.Push(block);
-                        currentConversation.ConditionalBlocks ??= new Dictionary<int, MspConditionalBlock>();
-                        currentConversation.ConditionalBlocks[block.IfStartLineIndex] = block;
-
-                        currentLine = NewLine();
-                        currentLine.LineType = MspLineType.IfStart;
-                        currentLine.LineContent.Text = string.Empty;
-                        currentConversation.Lines.Add(currentLine);
-                        currentLine = NewLine();
-                        continue;
-                    }
-
                     case Token.IfVarStart:
                     {
                         FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
                         var condition = argInvocationArg;
                         var block = new MspConditionalBlock
                         {
-                            ConditionType = MspConditionType.IfVar,
+                            ConditionType = token == Token.IfStart ? MspConditionType.If : MspConditionType.IfVar,
                             ConditionExpression = condition,
                             IfStartLineIndex = currentConversation.Lines.Count,
                             ElseLineIndex = -1,
@@ -205,7 +179,6 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.LoopStart:
                     {
-                        // 关闭之前的循环（如果有）
                         if (loopStack.Count > 0)
                         {
                             var prevLoop = loopStack.Pop();
@@ -218,16 +191,13 @@ namespace MSpeaker.Runtime.Parser
                         }
 
                         FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
-                        // 循环次数表达式不在解析阶段替换变量，保留原样供运行时评估
                         var countExpression = argInvocationArg.Trim();
-                        var loopCount = 1; // 默认值
-                        
-                        // 如果是纯数字，可以在解析时解析；如果是变量，在运行时解析
+                        var loopCount = 1;
+
                         if (!countExpression.StartsWith("$") && int.TryParse(countExpression, out var parsedCount))
                         {
                             loopCount = parsedCount;
                         }
-                        // 如果是变量（以 $ 开头），保留原样，在运行时解析
 
                         var loopInfo = new MspLoopInfo
                         {
@@ -251,7 +221,6 @@ namespace MSpeaker.Runtime.Parser
                     {
                         var name = ReplaceGlobalVariables(argInvocationArg);
 
-                        // 如果是文件开头且尚未产生任何有效内容，则直接重命名当前会话
                         if (currentConversation.Name == "Default" &&
                             currentConversation.Lines.Count == 0 &&
                             !HasMeaningfulLine(currentLine, sentenceParts))
@@ -303,9 +272,8 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.Choice:
                     {
-                        // 在添加 Choice 之前，先 flush 当前行
                         FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
-                        
+
                         currentConversation.Choices ??= new Dictionary<MspChoice, int>();
 
                         var (choiceText, targetConversation, metadata) = ParseChoice(raw);
@@ -316,8 +284,9 @@ namespace MSpeaker.Runtime.Parser
                             Metadata = metadata
                         };
 
-                        // Choice 锚定到"当前行索引"（当前行已 flush，Lines.Count - 1 就是该行的 index）
-                        var anchorLineIndex = currentConversation.Lines.Count > 0 ? currentConversation.Lines.Count - 1 : 0;
+                        var anchorLineIndex = currentConversation.Lines.Count > 0
+                            ? currentConversation.Lines.Count - 1
+                            : 0;
                         currentConversation.Choices.Add(choice, anchorLineIndex);
                         continue;
                     }
@@ -341,10 +310,8 @@ namespace MSpeaker.Runtime.Parser
                 }
             }
 
-            // 在对话结束前，flush 最后一行
             FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
 
-            // 处理未关闭的循环（在对话结束时自动关闭）
             while (loopStack.Count > 0)
             {
                 var loopInfo = loopStack.Pop();
@@ -356,7 +323,6 @@ namespace MSpeaker.Runtime.Parser
                 currentConversation.Lines.Add(endLine);
             }
 
-            // 检查未关闭的条件分支
             if (conditionalStack.Count > 0)
             {
                 MspDialogueLogger.LogWarning(-1, $"发现 {conditionalStack.Count} 个未关闭的条件分支（缺少 {{EndIf}}）。", asset);
@@ -384,7 +350,6 @@ namespace MSpeaker.Runtime.Parser
             if (ChoiceRegex.IsMatch(rawLine))
                 return Token.Choice;
 
-            // 检查特殊指令（必须在 ArgumentInvocationLineRegex 之前检查，因为它们也是带参数的）
             var ifMatch = IfRegex.Match(rawLine);
             if (ifMatch.Success)
             {
@@ -452,10 +417,7 @@ namespace MSpeaker.Runtime.Parser
         private static (string choiceText, string targetConversation, Dictionary<string, string> metadata) ParseChoice(
             string rawLine)
         {
-            // 先解析 metadata（不影响 choice 文本）
             var metadata = GatherMetadata(rawLine);
-
-            // 去掉所有 metadata，再按 "->" 分割
             var lineWithoutMetadata = MetadataRegex.Replace(rawLine, string.Empty).Trim();
             var m = ChoiceRegex.Match(lineWithoutMetadata);
             if (!m.Success)
@@ -467,11 +429,7 @@ namespace MSpeaker.Runtime.Parser
         private static string RemoveMetadataAndInvocationsFromSentence(string rawLine)
         {
             var line = rawLine ?? string.Empty;
-
-            // 移除行内 {{...}}（用于插入点/函数调用）
             line = FunctionRegex.Replace(line, string.Empty);
-
-            // 移除行内 ## ...
             line = MetadataRegex.Replace(line, string.Empty);
 
             return line;
@@ -496,27 +454,21 @@ namespace MSpeaker.Runtime.Parser
             var invocations = new Dictionary<int, MspFunctionInvocation>();
             if (string.IsNullOrEmpty(rawLine)) return invocations;
 
-            // 使用循环和起始位置来准确查找所有匹配项，避免重复模式导致的索引错误
             var searchStartIndex = 0;
             foreach (Match match in FunctionRegex.Matches(rawLine))
             {
                 var full = match.Value;
-                // 从上次搜索位置开始查找，确保找到正确的匹配位置
                 var index = rawLine.IndexOf(full, searchStartIndex, StringComparison.Ordinal);
 
-                // 如果找到了匹配，更新搜索起始位置以避免重复匹配
                 if (index >= 0)
                 {
                     searchStartIndex = index + full.Length;
 
-                    // 提取函数名和参数
-                    var content = full.Substring(2, full.Length - 4).Trim(); // 去掉 {{ 和 }}
+                    var content = full.Substring(2, full.Length - 4).Trim();
 
-                    // 检查是否有参数
                     var parenIndex = content.IndexOf('(');
                     if (parenIndex >= 0 && content.EndsWith(")"))
                     {
-                        // 带参数的函数调用
                         var funcName = content.Substring(0, parenIndex).Trim();
                         var argString = content.Substring(parenIndex + 1, content.Length - parenIndex - 2).Trim();
                         var args = MspArgumentParser.ParseArguments(argString);
@@ -529,7 +481,6 @@ namespace MSpeaker.Runtime.Parser
                     }
                     else
                     {
-                        // 无参数的函数调用
                         invocations[index] = new MspFunctionInvocation
                         {
                             FunctionName = content,
@@ -609,12 +560,10 @@ namespace MSpeaker.Runtime.Parser
             if (!HasMeaningfulLine(currentLine, sentenceParts))
                 return;
 
-            // 合并文本（保留换行）
             currentLine.LineContent.Text = sentenceParts.Count > 0
                 ? string.Join("\n", sentenceParts.Select(p => p.Text)).TrimEnd('\n')
                 : string.Empty;
 
-            // 合并 invocation（按文本拼接长度计算偏移）
             var offset = 0;
             for (var i = 0; i < sentenceParts.Count; i++)
             {
@@ -633,13 +582,9 @@ namespace MSpeaker.Runtime.Parser
                 }
 
                 offset += (part.Text ?? string.Empty).Length;
-                if (i < sentenceParts.Count - 1) offset += 1; // "\n"
+                if (i < sentenceParts.Count - 1) offset += 1;
             }
 
-            // 处理循环结束：当遇到新的 LoopStart 或对话结束时，关闭之前的循环
-            // 这个逻辑在解析循环时已经处理，这里不需要额外处理
-
-            // 确保 Speaker 为空时也能跑（例如纯旁白）
             conversation.Lines.Add(currentLine);
 
             currentLine = NewLine();

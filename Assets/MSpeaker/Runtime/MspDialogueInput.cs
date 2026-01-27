@@ -22,15 +22,12 @@ namespace MSpeaker.Runtime
 
             if (!pressed) return;
 
-            // 如果视图正在显示效果（如打字机效果），先跳过效果
             if (engine.View != null && engine.View.IsStillDisplaying())
             {
                 engine.View.SkipViewEffect();
             }
             else
             {
-                // 视图效果已完成，继续下一行
-                // 注意：如果当前行有 Choice，TryDisplayNextLine 会检查并等待用户选择
                 engine.TryDisplayNextLine();
             }
         }
@@ -40,7 +37,6 @@ namespace MSpeaker.Runtime
 #if ENABLE_INPUT_SYSTEM && !ENABLE_LEGACY_INPUT_MANAGER
             var pressed = false;
 
-            // 键盘
             if (Keyboard.current != null)
             {
                 pressed = advanceKey switch
@@ -54,13 +50,11 @@ namespace MSpeaker.Runtime
                 };
             }
 
-            // 鼠标
             if (!pressed && mouseLeftClick && Mouse.current != null)
                 pressed = Mouse.current.leftButton.wasPressedThisFrame;
 
             return pressed;
 #else
-            // 旧输入系统（Legacy Input Manager）
             bool pressed = Input.GetKeyDown(advanceKey);
             if (!pressed && mouseLeftClick)
                 pressed = Input.GetMouseButtonDown(0);

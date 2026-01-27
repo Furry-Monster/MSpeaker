@@ -117,7 +117,6 @@ namespace MSpeaker.Runtime.Views
                         engine.SwitchConversation(parsedConversations[conversationIndex]));
                 }
 
-                // 尝试给按钮文本赋值（优先 TMP）
                 var tmp = instance.GetComponentInChildren<TextMeshProUGUI>();
                 if (tmp != null) tmp.text = choice.ChoiceName;
 

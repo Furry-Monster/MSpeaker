@@ -35,7 +35,6 @@ namespace MSpeaker.Runtime.Views
             _typeCoroutine = StartCoroutine(TypeRoutine());
 
             OnSetView.Invoke();
-            // 注意：OnLineComplete 只在打字机效果完成后调用（在 FinishTypewriter 中）
         }
 
         public override void ClearView(MspEnginePlugin[] enginePlugins)
