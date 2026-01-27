@@ -88,7 +88,7 @@ namespace MSpeaker.Runtime.Parser
                     case Token.IfStart:
                     {
                         FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
-                        var condition = ReplaceGlobalVariables(argInvocationArg);
+                        var condition = argInvocationArg;
                         var block = new MspConditionalBlock
                         {
                             ConditionType = MspConditionType.If,
@@ -112,7 +112,7 @@ namespace MSpeaker.Runtime.Parser
                     case Token.IfVarStart:
                     {
                         FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
-                        var condition = ReplaceGlobalVariables(argInvocationArg);
+                        var condition = argInvocationArg;
                         var block = new MspConditionalBlock
                         {
                             ConditionType = MspConditionType.IfVar,
@@ -218,16 +218,21 @@ namespace MSpeaker.Runtime.Parser
                         }
 
                         FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
-                        var countStr = ReplaceGlobalVariables(argInvocationArg);
-                        if (!int.TryParse(countStr, out var loopCount))
+                        // 循环次数表达式不在解析阶段替换变量，保留原样供运行时评估
+                        var countExpression = argInvocationArg.Trim();
+                        var loopCount = 1; // 默认值
+                        
+                        // 如果是纯数字，可以在解析时解析；如果是变量，在运行时解析
+                        if (!countExpression.StartsWith("$") && int.TryParse(countExpression, out var parsedCount))
                         {
-                            MspDialogueLogger.LogError(i + 1, $"{{{{Loop({countStr})}}}} 中的参数必须是整数。", asset);
-                            loopCount = 1;
+                            loopCount = parsedCount;
                         }
+                        // 如果是变量（以 $ 开头），保留原样，在运行时解析
 
                         var loopInfo = new MspLoopInfo
                         {
                             LoopCount = loopCount,
+                            LoopCountExpression = countExpression,
                             LoopStartLineIndex = currentConversation.Lines.Count,
                             LoopEndLineIndex = -1
                         };
@@ -298,6 +303,9 @@ namespace MSpeaker.Runtime.Parser
 
                     case Token.Choice:
                     {
+                        // 在添加 Choice 之前，先 flush 当前行
+                        FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
+                        
                         currentConversation.Choices ??= new Dictionary<MspChoice, int>();
 
                         var (choiceText, targetConversation, metadata) = ParseChoice(raw);
@@ -308,8 +316,8 @@ namespace MSpeaker.Runtime.Parser
                             Metadata = metadata
                         };
 
-                        // Choice 锚定到“当前行索引”（当前行尚未 flush 时，Lines.Count 就是该行的 index）
-                        var anchorLineIndex = currentConversation.Lines.Count;
+                        // Choice 锚定到"当前行索引"（当前行已 flush，Lines.Count - 1 就是该行的 index）
+                        var anchorLineIndex = currentConversation.Lines.Count > 0 ? currentConversation.Lines.Count - 1 : 0;
                         currentConversation.Choices.Add(choice, anchorLineIndex);
                         continue;
                     }
@@ -333,6 +341,7 @@ namespace MSpeaker.Runtime.Parser
                 }
             }
 
+            // 在对话结束前，flush 最后一行
             FlushLineIntoConversation(currentConversation, ref currentLine, sentenceParts);
 
             // 处理未关闭的循环（在对话结束时自动关闭）
@@ -478,7 +487,6 @@ namespace MSpeaker.Runtime.Parser
                 if (MspDialogueGlobals.GlobalVariables.TryGetValue(key, out var value))
                     return value ?? string.Empty;
 
-                MspDialogueLogger.LogWarning(-1, $"检测到变量 ${key}，但 GlobalVariables 中没有对应条目。");
                 return match.Value;
             });
         }

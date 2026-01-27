@@ -1,7 +1,8 @@
+using MSpeaker.Runtime;
 using MSpeaker.Runtime.Utils;
 using UnityEngine;
 
-namespace MSpeaker.Runtime
+namespace Samples
 {
     /// <summary>
     /// 示例函数：用于演示各种函数调用功能，包括无参数和带参数的函数。

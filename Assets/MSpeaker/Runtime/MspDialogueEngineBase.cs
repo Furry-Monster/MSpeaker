@@ -70,6 +70,9 @@ namespace MSpeaker.Runtime
 
             StopConversation();
             _currentConversation = conversation;
+            _lineIndex = 0; // 确保从第一行开始
+            _skippingConditionalBlock = false; // 重置条件分支跳过状态
+            _conditionalBlockEndIndex = -1; // 重置条件分支结束索引
 
             // 先移除可能存在的监听器，避免重复添加
             OnConversationStart.RemoveListener(PersistentOnConversationStart.Invoke);
@@ -146,6 +149,14 @@ namespace MSpeaker.Runtime
                 yield break;
             }
 
+            // 检查行索引是否有效
+            if (_currentConversation?.Lines == null || _lineIndex < 0 || _lineIndex >= _currentConversation.Lines.Count)
+            {
+                MspDialogueLogger.LogError(-1, $"Invalid line index: {_lineIndex}, conversation has {_currentConversation?.Lines?.Count ?? 0} lines.", this);
+                _linePlaying = false;
+                yield break;
+            }
+
             _linePlaying = true;
 
             // 处理当前行的特殊类型
@@ -184,13 +195,22 @@ namespace MSpeaker.Runtime
             {
                 if (!_loopCounters.ContainsKey(_lineIndex))
                 {
-                    _loopCounters[_lineIndex] = currentLine.LoopInfo.LoopCount;
+                    // 在运行时评估循环次数（可能是变量）
+                    var loopCount = EvaluateLoopCount(currentLine.LoopInfo);
+                    _loopCounters[_lineIndex] = loopCount;
                 }
 
                 if (_loopCounters[_lineIndex] > 0)
                 {
                     _loopCounters[_lineIndex]--;
-                    // 继续执行循环内的内容
+                    // 继续执行循环内的内容（跳过 LoopStart 行本身，继续下一行）
+                    _lineIndex++;
+                    if (_lineIndex < _currentConversation.Lines.Count)
+                    {
+                        _linePlaying = false;
+                        StartCoroutine(DisplayDialogue());
+                        yield break;
+                    }
                 }
                 else
                 {
@@ -331,12 +351,48 @@ namespace MSpeaker.Runtime
 
             InvokeFunctions(_currentConversation.Lines[_lineIndex].LineContent?.Invocations);
 
+            // 等待视图完成显示效果（如打字机效果）
             yield return new WaitUntil(() => !dialogueView.IsStillDisplaying() || _isPaused);
 
             if (_isPaused)
                 yield return new WaitUntil(() => !_isPaused);
 
             _linePlaying = false;
+            
+            // 注意：这里不会自动继续下一行，需要用户输入（空格/点击）来调用 TryDisplayNextLine()
+        }
+
+        /// <summary>
+        /// 评估循环次数（支持变量）
+        /// </summary>
+        protected virtual int EvaluateLoopCount(MspLoopInfo loopInfo)
+        {
+            if (loopInfo == null) return 1;
+            
+            var expression = loopInfo.LoopCountExpression;
+            if (string.IsNullOrEmpty(expression))
+                return loopInfo.LoopCount; // 使用已解析的值
+            
+            // 如果是变量（以 $ 开头），从全局变量获取
+            if (expression.StartsWith("$"))
+            {
+                var varValue = GetVariableValue(expression);
+                if (varValue != null)
+                {
+                    // 尝试转换为整数
+                    if (varValue is int intVal) return intVal;
+                    if (int.TryParse(varValue.ToString(), out var parsed)) return parsed;
+                }
+                MspDialogueLogger.LogWarning(-1, $"Loop count variable {expression} not found or invalid, using default value 1.", this);
+                return 1;
+            }
+            
+            // 如果是数字，直接解析
+            if (int.TryParse(expression, out var count))
+                return count;
+            
+            // 默认返回已解析的值
+            return loopInfo.LoopCount;
         }
 
         /// <summary>
@@ -541,7 +597,10 @@ namespace MSpeaker.Runtime
         {
             if (parameters.Length == 0)
             {
-                return invocationArgs == null || invocationArgs.Count == 0 ? null : null; // 无参数方法
+                // 无参数方法：如果调用时也没有参数，返回空数组；如果有参数，说明不匹配
+                if (invocationArgs == null || invocationArgs.Count == 0)
+                    return Array.Empty<object>(); // 无参数方法，返回空数组
+                return null; // 方法无参数但调用时有参数，不匹配
             }
 
             // 检查是否是引擎参数
@@ -624,19 +683,47 @@ namespace MSpeaker.Runtime
 
         public void TryDisplayNextLine()
         {
-            if (_linePlaying) return;
-            if (_currentConversation == null) return;
-            if (dialogueView == null) return;
+            if (_linePlaying)
+            {
+                MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but line is still playing.", this);
+                return;
+            }
+            
+            if (_currentConversation == null)
+            {
+                MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but no conversation is active.", this);
+                return;
+            }
+            
+            if (dialogueView == null)
+            {
+                MspDialogueLogger.LogWarning(-1, "TryDisplayNextLine called but dialogue view is null.", this);
+                return;
+            }
+
+            // 检查是否有 Choice 需要显示
+            var hasChoices = _currentConversation?.Choices != null && 
+                            _currentConversation.Choices.Any(x => x.Value == _lineIndex);
+            
+            // 如果有 Choice，不继续下一行，等待用户选择
+            if (hasChoices)
+            {
+                // 有 Choice 时，不继续下一行，等待用户点击选择按钮
+                // 不要清除视图，保持当前文本和选择按钮显示
+                return;
+            }
 
             dialogueView.ClearView(enginePlugins);
 
             if (_lineIndex < _currentConversation.Lines.Count - 1)
             {
                 _lineIndex++;
+                MspDialogueLogger.LogWarning(-1, $"Displaying next line: {_lineIndex} of {_currentConversation.Lines.Count}", this);
                 StartCoroutine(DisplayDialogue());
             }
             else
             {
+                MspDialogueLogger.LogWarning(-1, $"No more lines to display. Stopping conversation. (Line {_lineIndex} of {_currentConversation.Lines.Count})", this);
                 StopConversation();
             }
         }

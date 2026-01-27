@@ -22,10 +22,17 @@ namespace MSpeaker.Runtime
 
             if (!pressed) return;
 
+            // 如果视图正在显示效果（如打字机效果），先跳过效果
             if (engine.View != null && engine.View.IsStillDisplaying())
+            {
                 engine.View.SkipViewEffect();
+            }
             else
+            {
+                // 视图效果已完成，继续下一行
+                // 注意：如果当前行有 Choice，TryDisplayNextLine 会检查并等待用户选择
                 engine.TryDisplayNextLine();
+            }
         }
 
         private bool WasPressedThisFrame()

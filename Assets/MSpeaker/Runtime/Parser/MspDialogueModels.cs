@@ -116,7 +116,8 @@ namespace MSpeaker.Runtime.Parser
     /// </summary>
     public sealed class MspLoopInfo
     {
-        public int LoopCount; // 循环次数
+        public int LoopCount; // 循环次数（运行时解析）
+        public string LoopCountExpression; // 循环次数表达式（可能是数字或变量名，如 "5" 或 "$loopCount"）
         public int LoopStartLineIndex; // 循环开始行索引
         public int LoopEndLineIndex; // 循环结束行索引
     }
