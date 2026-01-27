@@ -1,3 +1,4 @@
+using System;
 using MSpeaker.Runtime.Utils;
 
 namespace Samples
@@ -8,18 +9,17 @@ namespace Samples
     public static class ExampleMspFunctions
     {
         private static int _loopIndex = 0;
-        private static int _score = 0;
 
         [MspDialogueFunction]
         public static string GetPlayerName()
         {
-            return "Player";
+            return MspDialogueGlobals.GlobalVariables["playerName"];
         }
 
         [MspDialogueFunction]
         public static string GetTime()
         {
-            return System.DateTime.Now.ToString("HH:mm:ss");
+            return DateTime.Now.ToString("HH:mm:ss");
         }
 
         [MspDialogueFunction]
@@ -37,7 +37,7 @@ namespace Samples
         [MspDialogueFunction]
         public static void AddScore(int points)
         {
-            _score += points;
+            MspDialogueGlobals.GlobalVariables["score"] += points;
         }
 
         [MspDialogueFunction]

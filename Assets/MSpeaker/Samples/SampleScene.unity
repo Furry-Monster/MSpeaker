@@ -1069,7 +1069,7 @@ GameObject:
   - component: {fileID: 2079394216}
   - component: {fileID: 2079394217}
   m_Layer: 0
-  m_Name: Test
+  m_Name: DialogueStarter
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
