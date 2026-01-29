@@ -2,6 +2,10 @@
 
 一个强大、灵活的Unity对话系统框架，为游戏开发者提供完整的对话管理、解析、执行和UI渲染解决方案。
 
+![img](Screenshot/preview.png)
+
+![img](Screenshot/import.png)
+
 ## 主要特性
 
 - **自定义对话脚本格式**: 使用.msp格式定义对话，支持直观的脚本语言
