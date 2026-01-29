@@ -6,11 +6,20 @@ using MSpeaker.Runtime.Parser;
 
 namespace MSpeaker.Editor
 {
-    /// <summary>
-    /// 对话文件验证工具
-    /// </summary>
     public static class MspDialogueValidator
     {
+        private static readonly Regex IfRegex = new(@"^\s*{{\s*If\s*\(",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex IfVarRegex = new(@"^\s*{{\s*IfVar\s*\(",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex EndIfRegex = new(@"^\s*{{\s*EndIf\s*}}\s*$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex LoopRegex = new(@"^\s*{{\s*Loop\s*\(",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public enum ValidationSeverity
         {
             Info,
@@ -20,10 +29,10 @@ namespace MSpeaker.Editor
 
         public class ValidationIssue
         {
-            public int LineNumber;
-            public ValidationSeverity Severity;
-            public string Message;
-            public string CodeSnippet;
+            public readonly int LineNumber;
+            public readonly ValidationSeverity Severity;
+            public readonly string Message;
+            public readonly string CodeSnippet;
 
             public ValidationIssue(int lineNumber, ValidationSeverity severity, string message,
                 string codeSnippet = null)
@@ -37,8 +46,19 @@ namespace MSpeaker.Editor
 
         public class ValidationResult
         {
-            public bool IsValid => Issues.All(i => i.Severity != ValidationSeverity.Error);
-            public List<ValidationIssue> Issues = new();
+            private bool? _isValidCache;
+
+            public bool IsValid
+            {
+                get
+                {
+                    if (_isValidCache.HasValue) return _isValidCache.Value;
+                    _isValidCache = Issues.All(i => i.Severity != ValidationSeverity.Error);
+                    return _isValidCache.Value;
+                }
+            }
+
+            public readonly List<ValidationIssue> Issues = new();
             public List<MspConversation> ParsedConversations = new();
         }
 
@@ -93,13 +113,12 @@ namespace MSpeaker.Editor
                 var line = lines[i];
                 var lineNum = i + 1;
 
-                if (Regex.IsMatch(line, @"^\s*{{\s*If\s*\(", RegexOptions.IgnoreCase) ||
-                    Regex.IsMatch(line, @"^\s*{{\s*IfVar\s*\(", RegexOptions.IgnoreCase))
+                if (IfRegex.IsMatch(line) || IfVarRegex.IsMatch(line))
                 {
                     stack.Push(i);
                     ifLineNumbers[stack.Count - 1] = lineNum;
                 }
-                else if (Regex.IsMatch(line, @"^\s*{{\s*EndIf\s*}}\s*$", RegexOptions.IgnoreCase))
+                else if (EndIfRegex.IsMatch(line))
                 {
                     if (stack.Count == 0)
                     {
@@ -138,18 +157,20 @@ namespace MSpeaker.Editor
             for (var i = 0; i < lines.Length; i++)
             {
                 var line = lines[i];
-                var lineNum = i + 1;
-
-                if (Regex.IsMatch(line, @"^\s*{{\s*Loop\s*\(", RegexOptions.IgnoreCase))
+                if (LoopRegex.IsMatch(line))
                 {
-                    loopStartLines.Add(lineNum);
+                    loopStartLines.Add(i + 1);
                 }
             }
         }
 
         private static void ValidateConversationReferences(ValidationResult result)
         {
-            var conversationNames = result.ParsedConversations.Select(c => c.Name).ToHashSet();
+            var conversationNames = new HashSet<string>(result.ParsedConversations.Count);
+            foreach (var conversation in result.ParsedConversations)
+            {
+                conversationNames.Add(conversation.Name);
+            }
 
             foreach (var conversation in result.ParsedConversations)
             {
@@ -228,7 +249,7 @@ namespace MSpeaker.Editor
                         continue;
                     }
 
-                    if (choiceTexts.ContainsKey(choice.ChoiceName))
+                    if (!choiceTexts.TryAdd(choice.ChoiceName, 1))
                     {
                         result.Issues.Add(new ValidationIssue(
                             -1,
@@ -236,10 +257,6 @@ namespace MSpeaker.Editor
                             $"对话 \"{conversation.Name}\" 中有重复的选择文本: {choice.ChoiceName}",
                             choice.ChoiceName
                         ));
-                    }
-                    else
-                    {
-                        choiceTexts[choice.ChoiceName] = 1;
                     }
                 }
             }
@@ -282,13 +299,9 @@ namespace MSpeaker.Editor
             var nameCounts = new Dictionary<string, int>();
             foreach (var conversation in result.ParsedConversations)
             {
-                if (nameCounts.ContainsKey(conversation.Name))
+                if (!nameCounts.TryAdd(conversation.Name, 1))
                 {
                     nameCounts[conversation.Name]++;
-                }
-                else
-                {
-                    nameCounts[conversation.Name] = 1;
                 }
             }
 

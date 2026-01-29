@@ -7,9 +7,6 @@ using UnityEngine;
 
 namespace MSpeaker.Editor
 {
-    /// <summary>
-    /// 对话预览窗口
-    /// </summary>
     public class MspDialoguePreviewWindow : EditorWindow
     {
         private MspDialogueAsset _currentAsset;
@@ -20,6 +17,8 @@ namespace MSpeaker.Editor
         private MspConversation _selectedConversation;
         private bool _showStatistics = true;
         private bool _showRawContent = false;
+        private Dictionary<int, MspConditionalBlock> _cachedConditionalBlocks;
+        private string _lastAssetContentHash;
 
         [MenuItem("Window/MSpeaker/对话预览窗口")]
         public static void ShowWindow()
@@ -40,13 +39,21 @@ namespace MSpeaker.Editor
             _currentAsset = asset;
             if (asset != null)
             {
+                var contentHash = asset.Content?.GetHashCode().ToString() ?? "";
+                if (_conversations != null && _lastAssetContentHash == contentHash)
+                {
+                    return;
+                }
+
                 try
                 {
                     _conversations = MspDialogueParser.Parse(asset);
+                    _lastAssetContentHash = contentHash;
                     _selectedConversationIndex = _conversations.Count > 0 ? 0 : -1;
                     _selectedConversation = _selectedConversationIndex >= 0
                         ? _conversations[_selectedConversationIndex]
                         : null;
+                    _cachedConditionalBlocks = _selectedConversation?.ConditionalBlocks;
                 }
                 catch (System.Exception ex)
                 {
@@ -54,6 +61,8 @@ namespace MSpeaker.Editor
                     _conversations = null;
                     _selectedConversationIndex = -1;
                     _selectedConversation = null;
+                    _cachedConditionalBlocks = null;
+                    _lastAssetContentHash = null;
                 }
             }
             else
@@ -61,6 +70,8 @@ namespace MSpeaker.Editor
                 _conversations = null;
                 _selectedConversationIndex = -1;
                 _selectedConversation = null;
+                _cachedConditionalBlocks = null;
+                _lastAssetContentHash = null;
             }
         }
 
@@ -90,6 +101,7 @@ namespace MSpeaker.Editor
             {
                 if (_currentAsset != null)
                 {
+                    _lastAssetContentHash = null;
                     SetAsset(_currentAsset);
                 }
             }
@@ -117,6 +129,7 @@ namespace MSpeaker.Editor
                     {
                         _selectedConversationIndex = i;
                         _selectedConversation = conversation;
+                        _cachedConditionalBlocks = conversation.ConditionalBlocks;
                     }
                 }
             }
@@ -153,7 +166,7 @@ namespace MSpeaker.Editor
 
                 if (_selectedConversation.Lines != null)
                 {
-                    var normalLines = _selectedConversation.Lines.Count(l => l.LineType == MspLineType.Normal);
+                    var normalLines = _selectedConversation.Lines.Count(line => line.LineType == MspLineType.Normal);
                     var controlLines = _selectedConversation.Lines.Count - normalLines;
                     EditorGUILayout.LabelField($"普通对话行: {normalLines}");
                     EditorGUILayout.LabelField($"控制流行: {controlLines}");
@@ -303,9 +316,7 @@ namespace MSpeaker.Editor
             }
             else if (line.LineType == MspLineType.IfStart)
             {
-                var block = _selectedConversation.ConditionalBlocks?.Values
-                    .FirstOrDefault(b => b.IfStartLineIndex == index);
-                if (block != null)
+                if (_cachedConditionalBlocks != null && _cachedConditionalBlocks.TryGetValue(index, out var block))
                 {
                     EditorGUILayout.LabelField($"条件: {block.ConditionExpression}", EditorStyles.wordWrappedLabel);
                 }
@@ -328,18 +339,15 @@ namespace MSpeaker.Editor
             EditorGUILayout.Space(5);
         }
 
-        private Color GetLineTypeColor(MspLineType lineType)
+        private static Color GetLineTypeColor(MspLineType lineType)
         {
             return lineType switch
             {
                 MspLineType.Normal => Color.white,
                 MspLineType.Label => new Color(0.5f, 0.8f, 1f),
                 MspLineType.Goto => new Color(0.8f, 0.5f, 1f),
-                MspLineType.LoopStart => new Color(1f, 0.8f, 0.5f),
-                MspLineType.LoopEnd => new Color(1f, 0.8f, 0.5f),
-                MspLineType.IfStart => new Color(0.5f, 1f, 0.8f),
-                MspLineType.Else => new Color(0.5f, 1f, 0.8f),
-                MspLineType.EndIf => new Color(0.5f, 1f, 0.8f),
+                MspLineType.LoopStart or MspLineType.LoopEnd => new Color(1f, 0.8f, 0.5f),
+                MspLineType.IfStart or MspLineType.Else or MspLineType.EndIf => new Color(0.5f, 1f, 0.8f),
                 _ => Color.gray
             };
         }

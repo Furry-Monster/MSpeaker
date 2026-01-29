@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using MSpeaker.Runtime;
@@ -19,6 +20,11 @@ namespace MSpeaker.Editor
         private bool _showValidation = true;
         private bool _showPreview = false;
         private bool _validationDirty = true;
+
+        private string _cachedValidationSummary;
+        private int _cachedErrorCount;
+        private int _cachedWarningCount;
+        private int _cachedInfoCount;
 
         public override void OnEnable()
         {
@@ -47,8 +53,9 @@ namespace MSpeaker.Editor
                 try
                 {
                     _validationResult = MspDialogueValidator.Validate(asset);
+                    UpdateValidationSummaryCache();
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     Debug.LogError($"[MSpeaker] 验证失败: {ex.Message}");
                     _validationResult = new MspDialogueValidator.ValidationResult();
@@ -56,6 +63,7 @@ namespace MSpeaker.Editor
                         0,
                         MspDialogueValidator.ValidationSeverity.Error,
                         $"验证错误: {ex.Message}"));
+                    UpdateValidationSummaryCache();
                 }
 
                 _validationDirty = false;
@@ -95,6 +103,7 @@ namespace MSpeaker.Editor
             if (GUILayout.Button("重新验证"))
             {
                 _validationDirty = true;
+                _cachedValidationSummary = null;
             }
 
             if (GUILayout.Button("打开预览窗口"))
@@ -108,25 +117,47 @@ namespace MSpeaker.Editor
             ApplyRevertGUI();
         }
 
+        private void UpdateValidationSummaryCache()
+        {
+            if (_validationResult == null)
+            {
+                _cachedValidationSummary = "未验证";
+                return;
+            }
+
+            _cachedErrorCount = 0;
+            _cachedWarningCount = 0;
+            _cachedInfoCount = 0;
+
+            foreach (var issue in _validationResult.Issues)
+            {
+                switch (issue.Severity)
+                {
+                    case MspDialogueValidator.ValidationSeverity.Error:
+                        _cachedErrorCount++;
+                        break;
+                    case MspDialogueValidator.ValidationSeverity.Warning:
+                        _cachedWarningCount++;
+                        break;
+                    case MspDialogueValidator.ValidationSeverity.Info:
+                        _cachedInfoCount++;
+                        break;
+                }
+            }
+
+            if (_cachedErrorCount > 0)
+                _cachedValidationSummary = $"{_cachedErrorCount} 错误, {_cachedWarningCount} 警告, {_cachedInfoCount} 信息";
+            else if (_cachedWarningCount > 0)
+                _cachedValidationSummary = $"{_cachedWarningCount} 警告, {_cachedInfoCount} 信息";
+            else if (_cachedInfoCount > 0)
+                _cachedValidationSummary = $"{_cachedInfoCount} 信息";
+            else
+                _cachedValidationSummary = "无问题";
+        }
+
         private string GetValidationSummary()
         {
-            if (_validationResult == null) return "未验证";
-
-            var errorCount =
-                _validationResult.Issues.Count(i => i.Severity == MspDialogueValidator.ValidationSeverity.Error);
-            var warningCount =
-                _validationResult.Issues.Count(i => i.Severity == MspDialogueValidator.ValidationSeverity.Warning);
-            var infoCount =
-                _validationResult.Issues.Count(i => i.Severity == MspDialogueValidator.ValidationSeverity.Info);
-
-            if (errorCount > 0)
-                return $"{errorCount} 错误, {warningCount} 警告, {infoCount} 信息";
-            if (warningCount > 0)
-                return $"{warningCount} 警告, {infoCount} 信息";
-            if (infoCount > 0)
-                return $"{infoCount} 信息";
-
-            return "无问题";
+            return _cachedValidationSummary ?? "未验证";
         }
 
         private void DrawValidationSection()
@@ -151,11 +182,12 @@ namespace MSpeaker.Editor
                          i.Severity == MspDialogueValidator.ValidationSeverity.Error ? 0 :
                          i.Severity == MspDialogueValidator.ValidationSeverity.Warning ? 1 : 2))
             {
-                var messageType = issue.Severity == MspDialogueValidator.ValidationSeverity.Error
-                    ? MessageType.Error
-                    : issue.Severity == MspDialogueValidator.ValidationSeverity.Warning
-                        ? MessageType.Warning
-                        : MessageType.Info;
+                var messageType = issue.Severity switch
+                {
+                    MspDialogueValidator.ValidationSeverity.Error => MessageType.Error,
+                    MspDialogueValidator.ValidationSeverity.Warning => MessageType.Warning,
+                    _ => MessageType.Info
+                };
 
                 var lineInfo = issue.LineNumber > 0 ? $" (第 {issue.LineNumber} 行)" : "";
                 var message = $"{issue.Message}{lineInfo}";
