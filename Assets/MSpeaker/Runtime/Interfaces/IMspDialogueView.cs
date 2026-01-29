@@ -16,6 +16,8 @@ namespace MSpeaker.Runtime.Interfaces
         void Pause();
         void Resume();
         bool IsPaused();
-        void DisplayChoices(IMspDialogueEngine engine, MspConversation conversation, List<MspConversation> parsedConversations);
+
+        void DisplayChoices(IMspDialogueEngine engine, MspConversation conversation,
+            List<MspConversation> parsedConversations);
     }
 }

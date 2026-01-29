@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using MSpeaker.Runtime.Interfaces;
 using MSpeaker.Runtime.Parser;
 
@@ -31,7 +32,7 @@ namespace MSpeaker.Runtime.Plugins
             if (string.IsNullOrEmpty(key) || CurrentLine?.LineContent?.Metadata == null)
                 return defaultValue;
 
-            return CurrentLine.LineContent.Metadata.TryGetValue(key, out var value) ? value : defaultValue;
+            return CurrentLine.LineContent.Metadata.GetValueOrDefault(key, defaultValue);
         }
 
         public bool HasMetadata(string key)

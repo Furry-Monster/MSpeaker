@@ -94,10 +94,20 @@ namespace MSpeaker.Runtime.Services
         private bool TryConvertToNumber(object value, out float number)
         {
             number = 0f;
-            if (value is int i) { number = i; return true; }
-            if (value is float f) { number = f; return true; }
-            if (value is string s && float.TryParse(s, out var parsed)) { number = parsed; return true; }
-            return false;
+            switch (value)
+            {
+                case int i:
+                    number = i;
+                    return true;
+                case float f:
+                    number = f;
+                    return true;
+                case string s when float.TryParse(s, out var parsed):
+                    number = parsed;
+                    return true;
+                default:
+                    return false;
+            }
         }
     }
 }

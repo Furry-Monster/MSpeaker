@@ -15,11 +15,12 @@ namespace MSpeaker.Runtime
 {
     public abstract class MspDialogueEngineBase : MonoBehaviour, IMspDialogueEngine
     {
-        [Header("Dialogue Views")]
-        [SerializeField] protected MspDialogueViewBase dialogueView;
+        [Header("Dialogue Views")] [SerializeField]
+        protected MspDialogueViewBase dialogueView;
 
-        [Header("Function Invocations")]
-        [SerializeField] private bool searchAllAssemblies;
+        [Header("Function Invocations")] [SerializeField]
+        private bool searchAllAssemblies;
+
         [SerializeField] private List<string> includedAssemblies = new();
 
         public UnityEvent PersistentOnConversationStart = new();
@@ -178,7 +179,8 @@ namespace MSpeaker.Runtime
 
             var conversation = ParsedConversations.Find(c => c.Name == conversationName);
             if (conversation == null)
-                throw new ArgumentException($"Conversation \"{conversationName}\" not found.", nameof(conversationName));
+                throw new ArgumentException($"Conversation \"{conversationName}\" not found.",
+                    nameof(conversationName));
 
             SwitchConversation(conversation);
         }
@@ -262,6 +264,7 @@ namespace MSpeaker.Runtime
                 MspDialogueLogger.LogError(-1, $"Invalid line index: {_lineIndex}", this);
                 return false;
             }
+
             return true;
         }
 
@@ -365,6 +368,7 @@ namespace MSpeaker.Runtime
                 ResetConditionalState();
                 return block.EndIfLineIndex;
             }
+
             return null;
         }
 
@@ -428,6 +432,7 @@ namespace MSpeaker.Runtime
                 if (line.LineType == MspLineType.Normal && !string.IsNullOrWhiteSpace(line.LineContent?.Text))
                     return i;
             }
+
             return -1;
         }
 

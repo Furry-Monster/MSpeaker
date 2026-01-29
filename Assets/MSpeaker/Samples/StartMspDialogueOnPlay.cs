@@ -11,11 +11,18 @@ namespace Samples
 
         private void Start()
         {
-            MspDialogueGlobals.GlobalVariables["score"] = "50";
-            MspDialogueGlobals.GlobalVariables["level"] = "1";
-            MspDialogueGlobals.GlobalVariables["loopCount"] = "5";
+            // 好感度
+            MspDialogueGlobals.GlobalVariables["shikiAffection"] = "30";
+            // 天数
+            MspDialogueGlobals.GlobalVariables["dayCount"] = "1";
+            // 是否获得魔法书
+            MspDialogueGlobals.GlobalVariables["hasMagicBook"] = "false";
+            // 是否已经遇见 Shiki
+            MspDialogueGlobals.GlobalVariables["metShiki"] = "false";
+            // 玩家姓名
             MspDialogueGlobals.GlobalVariables["playerName"] = "Player";
-            MspDialogueGlobals.GlobalVariables["count"] = "3";
+            // 是否加入社团
+            MspDialogueGlobals.GlobalVariables["joinedClub"] = "false";
 
             engine.StartConversation(dialogue);
         }

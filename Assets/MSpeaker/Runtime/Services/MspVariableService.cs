@@ -13,8 +13,9 @@ namespace MSpeaker.Runtime.Services
 
         public string GetString(string key, string defaultValue = null)
         {
-            if (string.IsNullOrEmpty(key)) return defaultValue;
-            return _variables.TryGetValue(key, out var value) ? value : defaultValue;
+            return string.IsNullOrEmpty(key)
+                ? defaultValue
+                : _variables.GetValueOrDefault(key, defaultValue);
         }
 
         public int GetInt(string key, int defaultValue = 0)
@@ -70,9 +71,8 @@ namespace MSpeaker.Runtime.Services
         {
             if (string.IsNullOrEmpty(key)) return;
 
-            if (_variables.TryGetValue(key, out var oldValue))
+            if (_variables.Remove(key, out var oldValue))
             {
-                _variables.Remove(key);
                 OnVariableChanged?.Invoke(key, oldValue, null);
             }
         }

@@ -15,8 +15,7 @@ namespace MSpeaker.Runtime.Views
         [SerializeField] protected TextMeshProUGUI nameText;
         [SerializeField] protected TextMeshProUGUI sentenceText;
 
-        [Header("Choice UI")]
-        [SerializeField] protected Transform choiceButtonHolder;
+        [Header("Choice UI")] [SerializeField] protected Transform choiceButtonHolder;
         [SerializeField] protected GameObject choiceButtonPrefab;
 
         protected bool _isStillDisplaying;
@@ -60,10 +59,13 @@ namespace MSpeaker.Runtime.Views
                 choiceButton.OnChoiceClick.RemoveAllListeners();
                 Destroy(choiceButton.gameObject);
             }
+
             _choiceButtonInstances.Clear();
         }
 
-        public virtual void SkipViewEffect() { }
+        public virtual void SkipViewEffect()
+        {
+        }
 
         public virtual void Pause() => _isPaused = true;
 

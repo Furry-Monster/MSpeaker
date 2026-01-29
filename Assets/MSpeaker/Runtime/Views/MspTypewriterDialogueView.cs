@@ -79,7 +79,7 @@ namespace MSpeaker.Runtime.Views
                 if (nextShown != shown)
                 {
                     shown = nextShown;
-                    sentenceText.text = _fullText.Substring(0, shown);
+                    sentenceText.text = _fullText?[..shown];
                 }
 
                 yield return null;

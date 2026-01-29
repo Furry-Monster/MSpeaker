@@ -27,7 +27,8 @@ namespace MSpeaker.Runtime.Services
             _includedAssemblies = includedAssemblies ?? new List<string>();
         }
 
-        public void Invoke(Dictionary<int, MspFunctionInvocation> invocations, MspLineContent lineContent, IMspDialogueEngine engine)
+        public void Invoke(Dictionary<int, MspFunctionInvocation> invocations, MspLineContent lineContent,
+            IMspDialogueEngine engine)
         {
             if (invocations == null || invocations.Count == 0) return;
 
@@ -35,9 +36,8 @@ namespace MSpeaker.Runtime.Services
             if (methods.Length == 0) return;
 
             var insertedOffset = 0;
-            foreach (var kv in invocations.OrderBy(x => x.Key))
+            foreach (var (key, invocation) in invocations.OrderBy(x => x.Key))
             {
-                var invocation = kv.Value;
                 if (invocation == null || string.IsNullOrEmpty(invocation.FunctionName)) continue;
 
                 foreach (var method in methods)
@@ -57,7 +57,7 @@ namespace MSpeaker.Runtime.Services
                     if (method.ReturnType == typeof(string))
                     {
                         var replaced = (string)method.Invoke(null, args) ?? string.Empty;
-                        var insertIndex = Mathf.Clamp(kv.Key + insertedOffset, 0,
+                        var insertIndex = Mathf.Clamp(key + insertedOffset, 0,
                             (lineContent.Text ?? string.Empty).Length);
                         lineContent.Text = (lineContent.Text ?? string.Empty).Insert(insertIndex, replaced);
                         insertedOffset += replaced.Length;
@@ -113,7 +113,8 @@ namespace MSpeaker.Runtime.Services
             return _cachedMethods;
         }
 
-        private object[] BuildMethodArguments(ParameterInfo[] parameters, List<MspFunctionArgument> invocationArgs, IMspDialogueEngine engine)
+        private object[] BuildMethodArguments(ParameterInfo[] parameters, List<MspFunctionArgument> invocationArgs,
+            IMspDialogueEngine engine)
         {
             if (parameters.Length == 0)
             {
@@ -144,6 +145,7 @@ namespace MSpeaker.Runtime.Services
                         MspDialogueLogger.LogWarning(-1, $"变量 ${varName} 不存在。");
                         return null;
                     }
+
                     args[i] = ConvertValue(varValue, paramType);
                 }
                 else
