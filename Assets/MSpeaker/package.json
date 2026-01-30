@@ -1,0 +1,35 @@
+{
+  "name": "com.furrymonster.mspeaker",
+  "version": "1.0.0",
+  "displayName": "MSpeaker - Dialogue System",
+  "description": "A powerful and flexible Unity dialogue system framework that provides complete dialogue management, parsing, execution, and UI rendering solutions for game developers.",
+  "unity": "2022.3",
+  "unityRelease": "0f1",
+  "documentationUrl": "https://github.com/Furry-Monster/MSpeaker#readme",
+  "changelogUrl": "https://github.com/Furry-Monster/MSpeaker/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/Furry-Monster/MSpeaker/blob/main/LICENSE",
+  "dependencies": {
+    "com.unity.textmeshpro": "3.0.6",
+    "com.unity.inputsystem": "1.7.0"
+  },
+  "keywords": [
+    "dialogue",
+    "conversation",
+    "visual novel",
+    "narrative",
+    "story",
+    "rpg",
+    "game"
+  ],
+  "author": {
+    "name": "Furry-Monster",
+    "url": "https://github.com/Furry-Monster"
+  },
+  "samples": [
+    {
+      "displayName": "Basic Sample",
+      "description": "Basic dialogue system sample including example scene, dialogue files, and custom functions.",
+      "path": "Samples~"
+    }
+  ]
+}

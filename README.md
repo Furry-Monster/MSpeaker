@@ -6,6 +6,49 @@
 
 ![img](Screenshot/import.png)
 
+## 安装
+
+### 通过 Unity Package Manager (推荐)
+
+1. 打开 Unity 编辑器
+2. 打开 **Window > Package Manager**
+3. 点击左上角的 **+** 按钮
+4. 选择 **Add package from git URL...**
+5. 输入以下 URL：
+
+```
+https://github.com/Furry-Monster/MSpeaker.git?path=Assets/MSpeaker
+```
+
+#### 安装特定版本
+
+如需安装特定版本，可以在 URL 后添加版本标签：
+
+```
+https://github.com/Furry-Monster/MSpeaker.git?path=Assets/MSpeaker#v1.0.0
+```
+
+### 通过 manifest.json
+
+在项目的 `Packages/manifest.json` 文件中的 `dependencies` 部分添加：
+
+```json
+{
+  "dependencies": {
+    "com.furrymonster.mspeaker": "https://github.com/Furry-Monster/MSpeaker.git?path=Assets/MSpeaker"
+  }
+}
+```
+
+### 导入示例
+
+安装包后，可以通过 Package Manager 导入示例：
+
+1. 打开 **Window > Package Manager**
+2. 找到 **MSpeaker - Dialogue System**
+3. 展开 **Samples** 部分
+4. 点击 **Import** 按钮导入示例项目
+
 ## 主要特性
 
 - **自定义对话脚本格式**: 使用.msp格式定义对话，支持直观的脚本语言
