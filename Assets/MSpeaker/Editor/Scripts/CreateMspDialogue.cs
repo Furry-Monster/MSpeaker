@@ -6,18 +6,17 @@ namespace MSpeaker.Editor
 {
     public static class CreateMspDialogue
     {
-        private const string TemplateFullPath = "Assets/MSpeaker/Editor/Templates/DefaultDialogue.msp.txt";
-
         [MenuItem("Assets/Create/MSpeaker Dialogue (.msp)", false, 50)]
         public static void CreateDialogue()
         {
-            if (!File.Exists(TemplateFullPath))
+            var templatePath = MspEditorSettings.TemplatePath;
+            if (!File.Exists(templatePath))
             {
-                Debug.LogError("Template file not found at: " + TemplateFullPath);
+                Debug.LogError("[MSpeaker] 模板文件不存在: " + templatePath + "\n可在 Edit → Preferences → MSpeaker 中修改默认模板路径。");
                 return;
             }
 
-            ProjectWindowUtil.CreateScriptAssetFromTemplateFile(TemplateFullPath, "New Dialogue.msp");
+            ProjectWindowUtil.CreateScriptAssetFromTemplateFile(templatePath, "New Dialogue.msp");
         }
     }
 }

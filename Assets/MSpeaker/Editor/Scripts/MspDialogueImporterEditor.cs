@@ -35,7 +35,7 @@ namespace MSpeaker.Editor
                 _filePreview = File.ReadAllText(importer.assetPath);
             }
 
-            _validationDirty = true;
+            _validationDirty = MspEditorSettings.ImporterAutoRevalidate;
         }
 
         public override void OnInspectorGUI()
@@ -129,6 +129,7 @@ namespace MSpeaker.Editor
             _cachedWarningCount = 0;
             _cachedInfoCount = 0;
 
+            var showInfo = MspEditorSettings.ValidationShowInfo;
             foreach (var issue in _validationResult.Issues)
             {
                 switch (issue.Severity)
@@ -140,8 +141,10 @@ namespace MSpeaker.Editor
                         _cachedWarningCount++;
                         break;
                     case MspDialogueValidator.ValidationSeverity.Info:
-                        _cachedInfoCount++;
+                        if (showInfo) _cachedInfoCount++;
                         break;
+                    default:
+                        throw new ArgumentOutOfRangeException();
                 }
             }
 
@@ -178,9 +181,12 @@ namespace MSpeaker.Editor
                 new EditorGUILayout.ScrollViewScope(_validationScrollPosition, GUILayout.MaxHeight(300));
             _validationScrollPosition = scroll.scrollPosition;
 
-            foreach (var issue in _validationResult.Issues.OrderBy(i =>
-                         i.Severity == MspDialogueValidator.ValidationSeverity.Error ? 0 :
-                         i.Severity == MspDialogueValidator.ValidationSeverity.Warning ? 1 : 2))
+            var showInfoLevel = MspEditorSettings.ValidationShowInfo;
+            foreach (var issue in _validationResult.Issues
+                         .Where(i => showInfoLevel || i.Severity != MspDialogueValidator.ValidationSeverity.Info)
+                         .OrderBy(i =>
+                             i.Severity == MspDialogueValidator.ValidationSeverity.Error ? 0 :
+                             i.Severity == MspDialogueValidator.ValidationSeverity.Warning ? 1 : 2))
             {
                 var messageType = issue.Severity switch
                 {

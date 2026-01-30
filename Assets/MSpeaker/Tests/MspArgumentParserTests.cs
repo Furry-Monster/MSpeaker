@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using NUnit.Framework;
 using MSpeaker.Runtime.Parser;
 

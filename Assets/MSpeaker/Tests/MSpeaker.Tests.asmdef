@@ -3,7 +3,6 @@
   "rootNamespace": "MSpeaker",
   "references": [
     "MSpeaker.Runtime",
-    "UnityEngine",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],
