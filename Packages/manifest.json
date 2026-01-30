@@ -1,6 +1,5 @@
 {
   "dependencies": {
-    "com.ibra.ibralogue": "https://github.com/Ibralogue/Ibralogue.git",
     "com.unity.ide.rider": "3.0.38",
     "com.unity.inputsystem": "1.16.0",
     "com.unity.render-pipelines.universal": "17.3.0",

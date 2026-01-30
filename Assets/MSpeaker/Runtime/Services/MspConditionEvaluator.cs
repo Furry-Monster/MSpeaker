@@ -24,7 +24,7 @@ namespace MSpeaker.Runtime.Services
                 return false;
 
             var rightValue = _variableService.GetValue(conditionInfo.RightOperand);
-            if (rightValue == null && !IsLiteralValue(conditionInfo.RightOperand))
+            if (rightValue == null)
                 rightValue = conditionInfo.RightOperand;
 
             return CompareValues(leftValue, rightValue, conditionInfo.Operator);
